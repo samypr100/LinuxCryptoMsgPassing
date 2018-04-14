@@ -15,3 +15,10 @@ Rebuild and Reinstall Kernel... (in Kernel Directory):
 * `sudo make -j $(nproc) INSTALL_MOD_STRIP=1 modules_install`
 * `sudo make -j $(nproc) install`
 * `sudo reboot -h now`
+
+Enable Capability on Binary:
+* `sudo setcap <cap_num>+ep <binary_path>`
+* `sudo setcap 38+ep <binary_path>`
+
+Disable Capability on Binary
+* `sudo setcap -r <binary_path>`
