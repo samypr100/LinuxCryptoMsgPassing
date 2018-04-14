@@ -65,13 +65,13 @@ int main( int argc, char ** argv )
 
     char devname[32];
     strcpy(devname, "/dev/");
-    strcat(devname, DEVICE_NAME );
+    strcat(devname, DEVICE_NAME_A );
 
     fd = open(devname, 0);
 
     if (fd < 0) 
     {
-        printf("Can't open device file: %s\n", DEVICE_NAME);
+        printf("Can't open device file: %s\n", DEVICE_NAME_A);
         return -1;
     }
 

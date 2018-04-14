@@ -8,5 +8,6 @@ Usage and Compiling
 * `make` to compile
 * `sudo insmod char.ko` to enable module
   * `sudo chmod a+rw /dev/<DEVICE_NAME>` to be able to use
+  * `sudo chmod a+rw /dev/secret412*`
 * `sudo rmmod char.ko` to remove module
 

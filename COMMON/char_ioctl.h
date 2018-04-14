@@ -1,10 +1,11 @@
 /*********************************************************************
 *
-* This is a skeleton character device driver header file for
+* This is a character device driver header file for
 * JHU Operating Systems Security (695.412)
 *
 *
-* Author: T. McGuire
+* Original Author: T. McGuire
+* Modified By: Samuel Matos, Eric Forte
 * License: GPL
 *
 *
@@ -17,7 +18,9 @@
 //
 #include <linux/ioctl.h>
 
-#define DEVICE_NAME "jhu_oss_char"
+// SMATOS2,EFORTE3 Declaring the two devices
+#define DEVICE_NAME_A "secret412a"
+#define DEVICE_NAME_B "secret412b"
 
 //
 // The below comments are taken from Documentation/ioctl/ioctl-number.txt
