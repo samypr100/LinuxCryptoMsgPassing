@@ -366,15 +366,8 @@ struct vfs_ns_cap_data {
 
 #define CAP_AUDIT_READ		37
 
-//
-// JHU -- SKELETON FOR UPDATING
-//
-#define CAP_SECRET_FOURONETWO 38
 
-//
-// JHU -- SKELETON FOR UPDATING
-//
-#define CAP_LAST_CAP         CAP_SECRET_FOURONETWO 
+#define CAP_LAST_CAP         CAP_AUDIT_READ
 
 #define cap_valid(x) ((x) >= 0 && (x) <= CAP_LAST_CAP)
 
