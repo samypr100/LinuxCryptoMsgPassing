@@ -51,6 +51,8 @@ MODULE_VERSION("4.0.2018");
 static int g_majornum_a;
 static int g_majornum_b;
 static char g_buffer[MAX_ALLOWED_LEN] = {0};
+static struct jhu_ioctl_crypto evp_a;
+// static struct jhu_ioctl_crypto evp_b;
 
 static struct class *jhu_oss_class = NULL;
 static struct device *jhu_oss_device_a = NULL;
@@ -213,6 +215,7 @@ static void __exit jhu_oss_char_exit(void)
 static int dev_open(struct inode *inodep, struct file *filep)
 {
 
+    bool is_open_read, is_open_write, is_open_valid;
     //
     // Add your checking to this code path
     //
@@ -228,9 +231,9 @@ static int dev_open(struct inode *inodep, struct file *filep)
 
     // SMATOS2, EFORTE3
     /* enforce read or write access to this device */
-    bool is_open_read = (filep->f_mode & FMODE_READ) == FMODE_READ;
-    bool is_open_write = (filep->f_mode & FMODE_WRITE) == FMODE_WRITE;
-    bool is_open_valid = is_open_read || is_open_write;
+    is_open_read = (filep->f_mode & FMODE_READ) == FMODE_READ;
+    is_open_write = (filep->f_mode & FMODE_WRITE) == FMODE_WRITE;
+    is_open_valid = is_open_read || is_open_write;
     if (!is_open_valid)
     {
         printk("[*] Invalid Open Mode");
@@ -283,6 +286,8 @@ long dev_ioctl(struct file *file, unsigned int ioctl_num, unsigned long ioctl_pa
     int i = 0;
     int error = 0;
     char *temp = NULL;
+
+    struct jhu_ioctl_crypto __user *temp_evp = NULL;
     char ch;
 
     printk("[*] Usermode is requesting %08x ioctl\n", ioctl_num);
@@ -297,7 +302,8 @@ long dev_ioctl(struct file *file, unsigned int ioctl_num, unsigned long ioctl_pa
         //
         temp = (char *)ioctl_param;
         error = copy_to_user(temp, g_buffer, MAX_ALLOWED_LEN);
-
+        if (error)
+            return -EFAULT;
         printk("[+]    The message is %s\n", g_buffer);
 
         break;
@@ -315,12 +321,53 @@ long dev_ioctl(struct file *file, unsigned int ioctl_num, unsigned long ioctl_pa
         //
         memset(g_buffer, 0, MAX_ALLOWED_LEN);
         error = copy_from_user(g_buffer, (char *)ioctl_param, i);
+        if (error)
+        {
+            return -EFAULT;
+        }
 
         printk("[+]    The length passed in is %d\n", i);
         printk("[+]    The message is %s\n", g_buffer);
 
         break;
+    case IOCTL_READ_FROM_KERNEL_EVP:
+        printk("[*]    IOCTL_READ_FROM_KERNEL_EVP\n");
+        temp_evp = (struct jhu_ioctl_crypto *)ioctl_param;
 
+        error = copy_to_user(temp_evp->KEY, evp_a.KEY, JHU_IOCTL_CRYPTO_KEY_CHAR_LEN);
+        if (error)
+        {
+            return -EFAULT;
+        }
+
+        error = copy_to_user(temp_evp->IV, evp_a.IV, JHU_IOCTL_CRYPTO_IV_CHAR_LEN);
+        if (error)
+        {
+            return -EFAULT;
+        }
+
+        printk("[*]    KEY READ %s IV READ %s\n", evp_a.KEY, evp_a.IV);
+        break;
+    case IOCTL_WRITE_TO_KERNEL_EVP:
+        printk("[*]    IOCTL_WRITE_TO_KERNEL_EVP\n");
+        temp_evp = (struct jhu_ioctl_crypto *)ioctl_param;
+
+        memset(evp_a.KEY, 0, sizeof(evp_a.KEY));
+        error = copy_from_user(evp_a.KEY, temp_evp->KEY, JHU_IOCTL_CRYPTO_KEY_CHAR_LEN);
+        if (error)
+        {
+            return -EFAULT;
+        }
+
+        memset(evp_a.IV, 0, sizeof(evp_a.IV));
+        error = copy_from_user(evp_a.IV, temp_evp->IV, JHU_IOCTL_CRYPTO_IV_CHAR_LEN);
+        if (error)
+        {
+            return -EFAULT;
+        }
+
+        printk("[*]    KEY WRITEN %s IV WRITEN %s\n", evp_a.KEY, evp_a.IV);
+        break;
     default:
         break;
     }
