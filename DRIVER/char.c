@@ -81,6 +81,22 @@ static struct file_operations fops =
         .release = dev_release,
 };
 
+// SMATOS2, EFORTE3
+// https://elixir.bootlin.com/linux/v4.15.2/source/drivers/tty/tty_io.c#L3224
+// Use to set mode upon device creation to rw-rw-rw-
+static char *jhu_oss_char_devnode(struct device *dev, umode_t *mode)
+{
+    if (!mode)
+    {
+        return NULL;
+    }
+    if (dev->devt == MKDEV(g_majornum_a, 0) || dev->devt == MKDEV(g_majornum_b, 0))
+    {
+        *mode = 0666;
+    }
+    return NULL;
+}
+
 //
 // This path is called when the module is being loaded
 //
@@ -126,6 +142,11 @@ static int __init jhu_oss_char_init(void)
 
         return PTR_ERR(jhu_oss_class);
     }
+
+    // SMATOS2, EFORTE3
+    // https://elixir.bootlin.com/linux/v4.15.2/source/drivers/tty/tty_io.c#L3224
+    // Use to set mode upon device creation to rw-rw-rw-
+    jhu_oss_class->devnode = jhu_oss_char_devnode;
 
     printk("[+] Successfully created the device class\n");
 
@@ -195,7 +216,28 @@ static int dev_open(struct inode *inodep, struct file *filep)
     //
     // Add your checking to this code path
     //
-    printk("[*] Opening the file\n");
+    printk("[*] Opening the Device\n");
+
+    // SMATOS2, EFORTE3
+    // Check Capability before allowing open
+    if (!capable(CAP_SECRET_FOURONETWO))
+    {
+        printk("[*] Invalid Capability");
+        //return -EPERM; TODO UNCOMMENT ME TO ENFOCE THIS LATER AFTER FINALIZING THE MODULE
+    }
+
+    // SMATOS2, EFORTE3
+    /* enforce read or write access to this device */
+    bool is_open_read = (filep->f_mode & FMODE_READ) == FMODE_READ;
+    bool is_open_write = (filep->f_mode & FMODE_WRITE) == FMODE_WRITE;
+    bool is_open_valid = is_open_read || is_open_write;
+    if (!is_open_valid)
+    {
+        printk("[*] Invalid Open Mode");
+        return -EINVAL;
+    }
+
+    printk("[*] Successfully Opened Device\n");
 
     return 0;
 }

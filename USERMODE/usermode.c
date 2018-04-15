@@ -67,7 +67,7 @@ int main( int argc, char ** argv )
     strcpy(devname, "/dev/");
     strcat(devname, DEVICE_NAME_A );
 
-    fd = open(devname, 0);
+    fd = open(devname, O_RDONLY);
 
     if (fd < 0) 
     {
