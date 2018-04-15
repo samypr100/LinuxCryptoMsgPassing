@@ -98,6 +98,7 @@ int main(int argc, char **argv)
     strcpy(set_data, "Hello world!\n");
 
     // TODO
+    // https://wiki.openssl.org/index.php/EVP_Symmetric_Encryption_and_Decryption#Encrypting_the_message
     // EVP_CIPHER_CTX *ctx = EVP_CIPHER_CTX_new();
     // const EVP_CIPHER *cipher = EVP_aes_256_cbc();
     // const unsigned char *key;

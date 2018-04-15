@@ -27,6 +27,9 @@
 // Required for the copy to user function
 #include <linux/uaccess.h>
 
+// Memory Allocation
+#include <linux/slab.h>
+
 // Using a common header file for usermode/kernel mode code
 #include "../COMMON/char_ioctl.h"
 
@@ -81,6 +84,20 @@ static struct file_operations fops =
         .compat_ioctl = dev_ioctl,
         .unlocked_ioctl = dev_ioctl,
         .release = dev_release,
+};
+
+/*
+ * SMATOS2, EFORTE3 per-device data
+ */
+struct dev_private_data
+{
+    bool is_open_for_read;
+    bool is_open_for_write;
+    bool is_key_initialized;
+    bool is_iv_initialized;
+    int major;
+    int minor;
+    // ...
 };
 
 // SMATOS2, EFORTE3
@@ -215,6 +232,7 @@ static void __exit jhu_oss_char_exit(void)
 static int dev_open(struct inode *inodep, struct file *filep)
 {
 
+    struct dev_private_data *priv_data = filep->private_data;
     bool is_open_read, is_open_write, is_open_valid;
     //
     // Add your checking to this code path
@@ -240,7 +258,34 @@ static int dev_open(struct inode *inodep, struct file *filep)
         return -EINVAL;
     }
 
+    // priv_data is null for particular device
+    if (priv_data == NULL)
+    {
+        priv_data = kzalloc(sizeof(*priv_data), GFP_KERNEL);
+        if (!priv_data)
+        {
+            return -ENOMEM;
+        }
+        priv_data->major = imajor(inodep); // we can use for comparisons later with the major
+        priv_data->minor = iminor(inodep); // if we decide to use it...
+        filep->private_data = priv_data;
+    }
+
+    if (is_open_read)
+    {
+        priv_data->is_open_for_read = true;
+    }
+
+    if (is_open_write)
+    {
+        priv_data->is_open_for_write = true;
+    }
+
     printk("[*] Successfully Opened Device\n");
+    printk("[*] State {isRead: %d, isWrite: %d, isKey: %d, isIV: %d, major: %d, minor: %d}\n",
+           priv_data->is_open_for_read, priv_data->is_open_for_write,
+           priv_data->is_key_initialized, priv_data->is_iv_initialized,
+           priv_data->major, priv_data->minor);
 
     return 0;
 }
@@ -281,14 +326,14 @@ static ssize_t dev_write(struct file *filep, const char *buffer, size_t len, lof
     return len;
 }
 
-long dev_ioctl(struct file *file, unsigned int ioctl_num, unsigned long ioctl_param)
+long dev_ioctl(struct file *filep, unsigned int ioctl_num, unsigned long ioctl_param)
 {
     int i = 0;
     int error = 0;
     char *temp = NULL;
-
     struct jhu_ioctl_crypto __user *temp_evp = NULL;
     char ch;
+    struct dev_private_data *priv_data = filep->private_data; // device should be opened at this stage...
 
     printk("[*] Usermode is requesting %08x ioctl\n", ioctl_num);
 
@@ -358,6 +403,10 @@ long dev_ioctl(struct file *file, unsigned int ioctl_num, unsigned long ioctl_pa
         {
             return -EFAULT;
         }
+        if (priv_data == NULL)
+            printk("[*]    IOCTL_WRITE_TO_KERNEL_EVP priv_data = NULL\n");
+        else
+            priv_data->is_key_initialized = true;
 
         memset(evp_a.IV, 0, sizeof(evp_a.IV));
         error = copy_from_user(evp_a.IV, temp_evp->IV, JHU_IOCTL_CRYPTO_IV_CHAR_LEN);
@@ -365,8 +414,18 @@ long dev_ioctl(struct file *file, unsigned int ioctl_num, unsigned long ioctl_pa
         {
             return -EFAULT;
         }
+        if (priv_data == NULL)
+            printk("[*]    IOCTL_WRITE_TO_KERNEL_EVP priv_data = NULL\n");
+        else
+            priv_data->is_iv_initialized = true;
 
         printk("[*]    KEY WRITEN %s IV WRITEN %s\n", evp_a.KEY, evp_a.IV);
+
+        printk("[*] State {isRead: %d, isWrite: %d, isKey: %d, isIV: %d, major: %d, minor: %d}\n",
+            priv_data->is_open_for_read, priv_data->is_open_for_write,
+            priv_data->is_key_initialized, priv_data->is_iv_initialized,
+            priv_data->major, priv_data->minor);
+
         break;
     default:
         break;
@@ -380,6 +439,10 @@ static int dev_release(struct inode *inodep, struct file *filep)
     //
     // This path is called when the file descriptor is closed
     //
+
+    struct dev_private_data *priv_data = filep->private_data; // device should be opened at this stage...
+    filep->private_data = NULL;
+    kfree(priv_data);
 
     printk("[*] Releasing the file\n");
 

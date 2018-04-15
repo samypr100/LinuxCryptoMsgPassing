@@ -101,7 +101,7 @@ struct jhu_ioctl_crypto
 {
     unsigned char KEY[JHU_IOCTL_CRYPTO_KEY_CHAR_LEN]; // 32 len unsigned char should be 256-bit
     unsigned char IV[JHU_IOCTL_CRYPTO_IV_CHAR_LEN];   // 16 len unsigned char should be 128-bit IV (IV should be same as block size)
-};
+} __attribute__((__packed__)); // adding packed just in case for the future if we add more things...
 
 #define IOCTL_READ_FROM_KERNEL _IOR(JHU_IOCTL_MAGIC, JHU_IOCTL_RFK, char *)
 
