@@ -21,9 +21,10 @@
 // This header is required for the ioctl() call
 #include <sys/ioctl.h>
 
-// SMATOS2 LibSSL
+// SMATOS2, EFORTE3 LibSSL
 #include <openssl/evp.h>
 #include <openssl/aes.h>
+#include <openssl/rand.h>
 
 int ioctl_set_data(int fd, char *data)
 {
@@ -96,13 +97,15 @@ int main(int argc, char **argv)
     int ret_bw = -1;
     struct jhu_ioctl_crypto crypto_info_a;
     struct jhu_ioctl_crypto crypto_info_b;
-    char set_data[32];
-    char read_data[32];
+    // char set_data[32];
+    // char read_data[32];
     char devname_a[32];
     char devname_b[32];
-    memset(read_data, 0, 32);
+    unsigned char iv_a[16];
+    unsigned char iv_b[16];
+    // memset(read_data, 0, 32);
 
-    strcpy(set_data, "Hello world!\n");
+    // strcpy(set_data, "Hello world!\n");
 
     // TODO
     // https://wiki.openssl.org/index.php/EVP_Symmetric_Encryption_and_Decryption#Encrypting_the_message
@@ -116,6 +119,21 @@ int main(int argc, char **argv)
     strcat(devname_a, DEVICE_NAME_A);
     strcat(devname_b, DEVICE_NAME_B);
 
+    // Initialize Randomness Pool for Seeding
+    // https://wiki.openssl.org/index.php/Random_Numbers
+    int rc = RAND_load_file("/dev/random", 64);
+    if(rc != 64) {
+        printf("Unable to Initialize Seed\n");
+        return -1;
+    }
+
+    int rc_iv_a = RAND_bytes(iv_a, sizeof(iv_a));
+    int rc_iv_b = RAND_bytes(iv_b, sizeof(iv_b));
+    if(!rc_iv_a || !rc_iv_b){
+        printf("Unable to retrieve Random Bytes\n");
+        return -1;
+    }
+
     // Client A for Writing to Device B
 
     fd_aw = open(devname_b, O_WRONLY);
@@ -127,6 +145,7 @@ int main(int argc, char **argv)
     }
 
     ret_aw = ioctl_set_data_evp(fd_aw, "01234567890123456789012345678901", "0123456789012345");
+    // ret_aw = ioctl_set_data_evp(fd_aw, "01234567890123456789012345678901", iv_a);
 
     if (ret_aw < 0)
     {
@@ -146,6 +165,7 @@ int main(int argc, char **argv)
     }
 
     ret_bw = ioctl_set_data_evp(fd_bw, "10987654321098765432109876543210", "5432109876543210");
+    // ret_bw = ioctl_set_data_evp(fd_bw, "10987654321098765432109876543210", iv_b);
 
     if (ret_bw < 0)
     {
