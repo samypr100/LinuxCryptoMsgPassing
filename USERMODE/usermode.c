@@ -79,7 +79,7 @@ int ioctl_read_data_evp(int fd, struct jhu_ioctl_crypto *crypto_info)
 
     ioctl(fd, IOCTL_READ_FROM_KERNEL_EVP, crypto_info);
 
-    printf("[+] key read is %s, IV read is %s, total struct size %lu\n", crypto_info->KEY, crypto_info->IV, sizeof(crypto_info));
+    printf("[+] key read is %s, IV read is %s, total struct size %lu\n", crypto_info->KEY, crypto_info->IV, sizeof(*crypto_info));
 
     return 0;
 }
@@ -128,6 +128,13 @@ int main(int argc, char **argv)
 
     ret_aw = ioctl_set_data_evp(fd_aw, "01234567890123456789012345678901", "0123456789012345");
 
+    if (ret_aw < 0)
+    {
+        printf("Can't initialize KEY/IV for writing on %s \n", DEVICE_NAME_B);
+        close(fd_aw);
+        return -1;
+    }
+
     // Client B for Writing to Device A
 
     fd_bw = open(devname_a, O_WRONLY);
@@ -139,6 +146,14 @@ int main(int argc, char **argv)
     }
 
     ret_bw = ioctl_set_data_evp(fd_bw, "10987654321098765432109876543210", "5432109876543210");
+
+    if (ret_bw < 0)
+    {
+        printf("Can't initialize KEY/IV for writing on %s \n", DEVICE_NAME_A);
+        close(fd_aw);
+        close(fd_bw); // I know this is horrible, fix later
+        return -1;
+    }
 
     // Client A for Reading from Device A
 
@@ -152,6 +167,15 @@ int main(int argc, char **argv)
 
     ret_ar = ioctl_read_data_evp(fd_ar, &crypto_info_a);
 
+    if (ret_ar < 0)
+    {
+        printf("Can't retrieve KEY/IV for reading on %s \n", DEVICE_NAME_A);
+        close(fd_aw);
+        close(fd_bw);
+        close(fd_ar); // I know this is horrible, fix later
+        return -1;
+    }
+
     // Client B for Reading from Device B
 
     fd_br = open(devname_b, O_RDONLY);
@@ -164,6 +188,16 @@ int main(int argc, char **argv)
 
     ret_br = ioctl_read_data_evp(fd_br, &crypto_info_b);
 
+    if (ret_ar < 0)
+    {
+        printf("Can't retrieve KEY/IV for reading on %s \n", DEVICE_NAME_B);
+        close(fd_aw);
+        close(fd_bw);
+        close(fd_ar);
+        close(fd_br); // I know this is horrible, fix later
+        return -1;
+    }
+
     // ret = ioctl_set_data(fd, set_data);
     // ret = ioctl_read_data(fd, read_data);
 
@@ -171,10 +205,10 @@ int main(int argc, char **argv)
     // You will also use the read() and write() system calls
     //
 
-    close(fd_ar);
     close(fd_aw);
-    close(fd_br);
     close(fd_bw);
+    close(fd_ar);
+    close(fd_br);
 
     return 0;
 }
