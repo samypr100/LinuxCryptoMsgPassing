@@ -116,7 +116,7 @@ int main(int argc, char **argv)
     strcat(devname_a, DEVICE_NAME_A);
     strcat(devname_b, DEVICE_NAME_B);
 
-    // Client A for Writing
+    // Client A for Writing to Device B
 
     fd_aw = open(devname_b, O_WRONLY);
 
@@ -128,7 +128,7 @@ int main(int argc, char **argv)
 
     ret_aw = ioctl_set_data_evp(fd_aw, "01234567890123456789012345678901", "0123456789012345");
 
-    // Client B for Writing
+    // Client B for Writing to Device A
 
     fd_bw = open(devname_a, O_WRONLY);
 
@@ -140,7 +140,7 @@ int main(int argc, char **argv)
 
     ret_bw = ioctl_set_data_evp(fd_bw, "10987654321098765432109876543210", "5432109876543210");
 
-    // Client A for Reading
+    // Client A for Reading from Device A
 
     fd_ar = open(devname_a, O_RDONLY);
 
@@ -152,7 +152,7 @@ int main(int argc, char **argv)
 
     ret_ar = ioctl_read_data_evp(fd_ar, &crypto_info_a);
 
-    // Client B for Reading
+    // Client B for Reading from Device B
 
     fd_br = open(devname_b, O_RDONLY);
 
