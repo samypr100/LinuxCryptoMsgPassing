@@ -397,14 +397,14 @@ long dev_ioctl(struct file *filep, unsigned int ioctl_num, unsigned long ioctl_p
         // TODO we should check if it's null terminated on WRITE
         if (strlen(correct_evp->KEY) != JHU_IOCTL_CRYPTO_KEY_CHAR_LEN - 1)
         {
-            printk(KERN_WARNING "KEY not initialized properly\n");
+            printk(KERN_WARNING "[*]    KEY not initialized properly\n");
             return -EAGAIN;
         }
 
         // TODO we should check if it's null terminated on WRITE
         if (strlen(correct_evp->IV) != JHU_IOCTL_CRYPTO_IV_CHAR_LEN - 1)
         {
-            printk(KERN_WARNING "IV not initialized properly\n");
+            printk(KERN_WARNING "[*]    IV not initialized properly\n");
             return -EAGAIN;
         }
 
@@ -450,13 +450,13 @@ long dev_ioctl(struct file *filep, unsigned int ioctl_num, unsigned long ioctl_p
         // TODO Does this check if it's null terminated? or strnlen_user does a good job?
         if (strnlen_user(temp_evp->KEY, JHU_IOCTL_CRYPTO_KEY_CHAR_LEN) != JHU_IOCTL_CRYPTO_KEY_CHAR_LEN)
         {
-            printk(KERN_WARNING "KEY not correct size\n");
+            printk(KERN_WARNING "[*]    KEY not correct size\n");
             return -EAGAIN;
         }
         // TODO Does this check if it's null terminated? or strnlen_user does a good job?
         if (strnlen_user(temp_evp->IV, JHU_IOCTL_CRYPTO_IV_CHAR_LEN) != JHU_IOCTL_CRYPTO_IV_CHAR_LEN)
         {
-            printk(KERN_WARNING "IV not correct size\n");
+            printk(KERN_WARNING "[*]    IV not correct size\n");
             return -EAGAIN;
         }
 
