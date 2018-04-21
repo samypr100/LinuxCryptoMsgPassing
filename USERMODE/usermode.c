@@ -121,8 +121,8 @@ int main(int argc, char **argv)
 
     // Initialize Randomness Pool for Seeding
     // https://wiki.openssl.org/index.php/Random_Numbers
-    int rc = RAND_load_file("/dev/random", 64);
-    if(rc != 64) {
+    int rc = RAND_load_file("/dev/urandom", 32); // TODO: switch to /dev/random later (since /dev/random is precious)
+    if(rc != 32) {
         printf("Unable to Initialize Seed\n");
         return -1;
     }

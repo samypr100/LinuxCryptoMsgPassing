@@ -464,6 +464,7 @@ long dev_ioctl(struct file *filep, unsigned int ioctl_num, unsigned long ioctl_p
         error = copy_from_user(correct_evp->KEY, temp_evp->KEY, JHU_IOCTL_CRYPTO_KEY_CHAR_LEN);
         if (error)
         {
+            memset(correct_evp->KEY, 0, sizeof(correct_evp->KEY)); // Clear memory after error
             return -EFAULT;
         }
         priv_data->is_key_initialized = true;
@@ -472,6 +473,7 @@ long dev_ioctl(struct file *filep, unsigned int ioctl_num, unsigned long ioctl_p
         error = copy_from_user(correct_evp->IV, temp_evp->IV, JHU_IOCTL_CRYPTO_IV_CHAR_LEN);
         if (error)
         {
+            memset(correct_evp->KEY, 0, sizeof(correct_evp->KEY)); // Clear memory after error
             return -EFAULT;
         }
         priv_data->is_iv_initialized = true;
