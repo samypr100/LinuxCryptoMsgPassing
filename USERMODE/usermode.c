@@ -152,21 +152,22 @@ int decrypt(unsigned char *ciphertext, int ciphertext_len, unsigned char *key,
 */
 
 // SMATOS2, EFORTE3 decrypt for driverFunction
+/*
 char * D_decrypt(unsigned char *ciphertext,unsigned char *key,unsigned char *iv)
 {
     int decryptedtext_len;
 
-    /* Buffer for the decrypted text */
+    // Buffer for the decrypted text 
     unsigned char decryptedtext[128];
 
     decryptedtext_len = decrypt(ciphertext, strlen ((char *)ciphertext), key, iv, decryptedtext);
 
-    /* Add a NULL terminator. We are expecting printable text */
+    // Add a NULL terminator. We are expecting printable text 
     decryptedtext[decryptedtext_len] = '\0';
 
     return decryptedtext;
 }
-
+*/
 
 
 // SMATOS2, EFORTE3 Crypt Test Function
@@ -395,7 +396,7 @@ int main(int argc, char **argv)
     close(fd_ar);
     close(fd_br);
 
-    cryptTest();
+    //cryptTest();
     //Testing Key and IV values
     /* A 256 bit key */
     unsigned char *key = (unsigned char *)"01234567890123456789012345678901";
