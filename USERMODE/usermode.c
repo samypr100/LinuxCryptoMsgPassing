@@ -129,6 +129,45 @@ int decrypt(unsigned char *ciphertext, int ciphertext_len, unsigned char *key,
     return plaintext_len;
 }
 
+// SMATOS2, EFORTE3 encrypt for driverFunction
+
+//int D_encrypt(unsigned char *plaintext,unsigned char *key,unsigned char *iv,unsigned char *ciphertextBuf)
+/*
+{
+    int ciphertext_len;
+
+    //Buffer For ciphertext
+    unsigned char ciphertext[128];
+
+    ciphertext_len = encrypt (plaintext, strlen ((char *)plaintext), key, iv, ciphertext);
+
+
+    printf("Ciphertext is:\n");
+    BIO_dump_fp (stdout, (const char *)ciphertext, ciphertext_len);
+
+    ciphertextBuf = ciphertext;
+
+    return ciphertext_len;
+}
+*/
+
+// SMATOS2, EFORTE3 decrypt for driverFunction
+char * D_decrypt(unsigned char *ciphertext,unsigned char *key,unsigned char *iv)
+{
+    int decryptedtext_len;
+
+    /* Buffer for the decrypted text */
+    unsigned char decryptedtext[128];
+
+    decryptedtext_len = decrypt(ciphertext, strlen ((char *)ciphertext), key, iv, decryptedtext);
+
+    /* Add a NULL terminator. We are expecting printable text */
+    decryptedtext[decryptedtext_len] = '\0';
+
+    return decryptedtext;
+}
+
+
 
 // SMATOS2, EFORTE3 Crypt Test Function
 int cryptTest(void)
@@ -357,6 +396,13 @@ int main(int argc, char **argv)
     close(fd_br);
 
     cryptTest();
+    //Testing Key and IV values
+    /* A 256 bit key */
+    unsigned char *key = (unsigned char *)"01234567890123456789012345678901";
+
+    /* A 128 bit IV */
+    unsigned char *iv = (unsigned char *)"0123456789012345";
+
 
     //TODO
     //1. Initialize IV/KEY information between devices (depending on device, one sends one recives should be done in if statements)
@@ -387,9 +433,15 @@ int main(int argc, char **argv)
         char userInput[512];
         fgets(userInput, 512, stdin);
 
-        //TODO Write to b
-        //stuffToWrite = encryptD(userInput, IV_B);
-        //writeToB(stuffToWrite);
+        int ciphertext_len;
+        unsigned char ciphertext[128];
+
+        ciphertext_len = encrypt (userInput, strlen ((char *)userInput), key, iv, ciphertext);
+        //printf("Ciphertext is:\n");
+        //BIO_dump_fp (stdout, (const char *)ciphertext, ciphertext_len);
+
+        //TODO
+        //writeToB(cipherText);
 
 
     }
@@ -413,11 +465,16 @@ int main(int argc, char **argv)
         //Take user input to send to a (write to a)
         char userInput[512];
         fgets(userInput, 512, stdin);
+       
+        int ciphertext_len;
+        unsigned char ciphertext[128];
 
-        //TODO Write to a
-        //stuffToWrite = encryptD(userInput, IV_A);
-        //writeToB(stuffToWrite);
+        ciphertext_len = encrypt (userInput, strlen ((char *)userInput), key, iv, ciphertext);
+        //printf("Ciphertext is:\n");
+        //BIO_dump_fp (stdout, (const char *)ciphertext, ciphertext_len);
 
+        //TODO 
+        //writeToA(ciphertext);
 
     }
 
