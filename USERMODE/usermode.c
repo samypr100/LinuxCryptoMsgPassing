@@ -391,6 +391,8 @@ int main(int argc, char **argv)
             return -1;
         }
 
+
+
         printf("Please type your input below. The recieved data from \"b\" will show up as [a]:\n");
         printf("Your input will show up as [me]:\n");
 
@@ -404,20 +406,44 @@ int main(int argc, char **argv)
         //decryptThingsFromA = decryptD(thingsReadFromA, IV_A);
         //printf("[a] %s, decryptThingsFromA);
         //}
+        
+        char read_msg[1025];
+        read(client_crypto.read_fd, read_msg, 1024);
+        read_msg[1024] = '\0';
+        //printf("Read msg %s %zu\n", read_msg, strlen(read_msg));
+
+
+        int decryptedtext_len;
+        unsigned char decryptedtext[1025];
+
+        // Decrypt the ciphertext 
+        decryptedtext_len = decrypt(read_msg, strlen ((char *)read_msg), client_crypto.read_crypto_info.KEY, client_crypto.read_crypto_info.IV, decryptedtext);
+
+        // Add a NULL terminator. We are expecting printable text 
+        decryptedtext[decryptedtext_len] = '\0';
+
+        // Show the decrypted text 
+        printf("Decrypted text is:\n");
+        printf("%s\n", decryptedtext);
+        //printf("[b] %s, decryptThingsFromB);
+
+
+
 
         //Take user input to send to b (write to b)
-        char userInput[512];
-        fgets(userInput, 512, stdin);
+        char userInput[1024];
+        fgets(userInput, 1024, stdin);
 
         int ciphertext_len;
-        unsigned char ciphertext[128];
+        unsigned char ciphertext[1024];
 
-        ciphertext_len = encrypt(userInput, strlen((char *)userInput), key, iv, ciphertext);
+        ciphertext_len = encrypt(userInput, strlen((char *)userInput), client_crypto.write_crypto_info.KEY, client_crypto.write_crypto_info.IV, ciphertext);
         //printf("Ciphertext is:\n");
         //BIO_dump_fp (stdout, (const char *)ciphertext, ciphertext_len);
 
         //TODO
-        //writeToB(cipherText);
+        //writeToA(ciphertext);
+        write(client_crypto.write_fd, ciphertext, ciphertext_len);
     }
 
     if (strchr(argv[1], 'b') != NULL) {
@@ -442,14 +468,18 @@ int main(int argc, char **argv)
         //TODO If there is things to be read from a (data from b), read them and print to the screen
         if (1) {
             //TODO Read b
-            //thingsReadFromA = read_B();
+            //thingsReadFromB = read_B();
+            char read_msg[1025];
+            read(client_crypto.read_fd, read_msg, 1024);
+            read_msg[1024] = '\0';
+            //printf("Read msg %s %zu\n", read_msg, strlen(read_msg));
 
-            /*
+            
             int decryptedtext_len;
-            unsigned char decryptedtext[512];
+            unsigned char decryptedtext[1025];
 
             // Decrypt the ciphertext 
-            decryptedtext_len = decrypt(thingsFromB, strlen ((char *)thingsFromB), key, iv, decryptedtext);
+            decryptedtext_len = decrypt(read_msg, strlen ((char *)read_msg), client_crypto.read_crypto_info.KEY, client_crypto.read_crypto_info.IV, decryptedtext);
 
             // Add a NULL terminator. We are expecting printable text 
             decryptedtext[decryptedtext_len] = '\0';
@@ -458,24 +488,24 @@ int main(int argc, char **argv)
             printf("Decrypted text is:\n");
             printf("%s\n", decryptedtext);
             //printf("[b] %s, decryptThingsFromB);
-*/
+
         }
 
         //Take user input to send to a (write to a)
-        char userInput[512];
-        fgets(userInput, 512, stdin);
+        char userInput[1024];
+        fgets(userInput, 1024, stdin);
 
         int ciphertext_len;
-        unsigned char ciphertext[512];
+        unsigned char ciphertext[1024];
 
-        ciphertext_len = encrypt(userInput, strlen((char *)userInput), key, iv, ciphertext);
+        ciphertext_len = encrypt(userInput, strlen((char *)userInput), client_crypto.write_crypto_info.KEY, client_crypto.write_crypto_info.IV, ciphertext);
         //printf("Ciphertext is:\n");
         //BIO_dump_fp (stdout, (const char *)ciphertext, ciphertext_len);
 
         //TODO
         //writeToA(ciphertext);
+        write(client_crypto.write_fd, ciphertext, ciphertext_len);
     }
-
     if (strchr(argv[1], 't') != NULL) {
 
         // Init
