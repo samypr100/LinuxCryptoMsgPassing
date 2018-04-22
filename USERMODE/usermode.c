@@ -102,6 +102,16 @@ int main(int argc, char **argv)
     unsigned char iv_a[16];
     unsigned char iv_b[16];
 
+    if (argc < 2) {
+        printf("Usage: ./myuser [a or b] \n");
+        printf("Please enter an argument \n");
+        return -1;
+    }
+    printf("Setting up encryption info...\n");
+
+
+
+
     // TODO
     // https://wiki.openssl.org/index.php/EVP_Symmetric_Encryption_and_Decryption#Encrypting_the_message
     // EVP_CIPHER_CTX *ctx = EVP_CIPHER_CTX_new();
