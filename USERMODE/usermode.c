@@ -359,9 +359,69 @@ int main(int argc, char **argv)
     cryptTest();
 
     //TODO
-    //1. Send IV/KEY information between devices (depending on device, one sends one recives)
-    //2. Setup User interaction to recive data and encrypt then transmit to device
-    //3. Recive data from device and decrypt
+    //1. Initialize IV/KEY information between devices (depending on device, one sends one recives should be done in if statements)
+
+    //User interaction structure
+    if(strchr(argv[1],'a') != NULL)
+    {
+        //If user inputs a, we read from a and write to b
+        //setup Encryption Info
+        //For 60 seconds try to obtain key/IV
+
+        printf("a is ready\n\n");
+        printf("Please type your input below. The recieved data from \"b\" will show up as [a]:\n");
+        printf("Your input will show up as [me]:\n"); 
+
+        //Run Driver interaction
+
+        //TODO If there is things to be read from a (data from b), read them and print to the screen
+        //if(thingsReadFromA)
+        //{
+            //thingsReadFromA = read_a();
+            //printf("[a] %s, thingsReadFromA);
+            //decryptThingsFromA = decryptD(thingsReadFromA, IV_A);
+            //printf("[a] %s, decryptThingsFromA);
+        //}
+        
+        //Take user input to send to b (write to b)
+        char userInput[512];
+        fgets(userInput, 512, stdin);
+
+        //TODO Write to b
+        //stuffToWrite = encryptD(userInput, IV_B);
+        //writeToB(stuffToWrite);
+
+
+    }
+    if(strchr(argv[1],'b') != NULL)
+    {
+        printf("b is ready\n\n");
+        printf("Please type your input below. The recieved data from \"a\" will show up as [a]:\n");
+        printf("Your input will show up as [me]:\n"); 
+
+        //Run Driver interaction
+
+        //TODO If there is things to be read from a (data from b), read them and print to the screen
+        //if(thingsReadFromA)
+        //{
+            //thingsReadFromB = read_b();
+            //printf("[b] %s, thingsReadFromB);
+            //decryptThingsFromB = decryptD(thingsReadFromB, IV_B);
+            //printf("[b] %s, decryptThingsFromB);
+        //}
+        
+        //Take user input to send to a (write to a)
+        char userInput[512];
+        fgets(userInput, 512, stdin);
+
+        //TODO Write to a
+        //stuffToWrite = encryptD(userInput, IV_A);
+        //writeToB(stuffToWrite);
+
+
+    }
+
+
 
 
 
