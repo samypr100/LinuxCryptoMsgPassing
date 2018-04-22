@@ -281,10 +281,13 @@ static int dev_open(struct inode *inodep, struct file *filep)
 static ssize_t dev_read(struct file *filep, char *buffer, size_t len, loff_t *offset)
 {
 
-    size_t num_read;
-    //int error = -1;
+    char *buf;
+    int max_len_to_read;
+    int error = 0;
     bool can_read;
     struct dev_private_data *priv_data = filep->private_data; // device should be opened at this stage...
+    struct jhu_ioctl_crypto *correct_device = NULL;
+    char *correct_msg = NULL;
 
     printk(KERN_INFO "[*] Usermode is requesting %zu chars from kernelmode\n", len);
 
@@ -293,22 +296,69 @@ static ssize_t dev_read(struct file *filep, char *buffer, size_t len, loff_t *of
         return -EBADF;
     }
 
+    // verify if we can read and it's initialized properly
     can_read = priv_data->is_open_for_read && priv_data->is_key_initialized && priv_data->is_iv_initialized;
     if (!can_read) {
         printk(KERN_WARNING "[*]    Unable to read data because state is not ready.\n");
         return -EAGAIN;
     }
-    //
-    // NOTE: copy_to_user takes the format ( to, from, size)
-    //       it returns 0 on success
-    //
-    // Make sure you are only reading the requested amount!
-    //
-    //error= copy_to_user(buffer, KERNEL_SOURCE, KERNEL_SOURCE_SIZE);
 
-    num_read = len;
+    // verify what device we're writing to
+    if (priv_data->major == g_majornum_a) {
+        correct_device = &evp_a;
+        correct_msg = msg_a;
+    } else if (priv_data->major == g_majornum_b) {
+        correct_device = &evp_b;
+        correct_msg = msg_b;
+    } else {
+        return -EFAULT;
+    }
 
-    return num_read;
+    // make sure that the user doesn't attempt to read more than 1024 bytes at a time
+    if (len > MAX_ALLOWED_MESSAGE) {
+        printk(KERN_WARNING "[*]    Message to read is too long.\n");
+        return -EINVAL;
+    }
+
+    // atomic operation start
+    mutex_lock(&priv_data->lock);
+
+    max_len_to_read = strlen(correct_msg);
+
+    printk(KERN_INFO "[*]    Current Stored Message Size %d\n", max_len_to_read);
+
+    // make sure to read requested len if possible...
+    if (len <= max_len_to_read) {
+        max_len_to_read = len;
+    }
+
+    printk(KERN_INFO "[*]    Going to read %d bytes.\n", max_len_to_read);
+
+    // allocate internal buffer to copy data to
+    buf = kzalloc(max_len_to_read + 1, GFP_KERNEL);
+    if (buf == NULL) {
+        mutex_unlock(&priv_data->lock);
+        return -ENOMEM;
+    }
+    strncpy(buf, correct_msg, max_len_to_read);
+    buf[max_len_to_read] = '\0'; // make sure it's null terminated
+    error = copy_to_user(buffer, buf, max_len_to_read + 1);
+    if (error) {
+        kfree(buf);
+        mutex_unlock(&priv_data->lock);
+        return -EFAULT;
+    }
+
+    print_hex_dump(KERN_INFO, "[*]    MSG READ: ", DUMP_PREFIX_NONE, 16, 1, buf, max_len_to_read + 1, true);
+
+    // clear out stored message
+    // TODO: should we partition message after read (e.g. shift the non-read bytes at the beggining of the file)
+    memset(correct_msg, 0, MAX_ALLOWED_MESSAGE);
+
+    kfree(buf);
+    mutex_unlock(&priv_data->lock);
+
+    return max_len_to_read;
 }
 
 //
@@ -354,7 +404,7 @@ static ssize_t dev_write(struct file *filep, const char *buffer, size_t len, lof
 
     // make sure that the user doesn't attempt to write more than 1024 bytes at a time
     if (len > MAX_ALLOWED_MESSAGE) {
-        printk(KERN_WARNING "[*]    Message is too long.\n");
+        printk(KERN_WARNING "[*]    Message to write is too long.\n");
         return -EINVAL;
     }
 
@@ -378,8 +428,8 @@ static ssize_t dev_write(struct file *filep, const char *buffer, size_t len, lof
     printk(KERN_INFO "[*]    Current Space left to write is %d\n", curr_space_left);
 
     if (len > curr_space_left) {
-        mutex_unlock(&priv_data->lock);
         kfree(buf);
+        mutex_unlock(&priv_data->lock);
         return -E2BIG;
     }
 

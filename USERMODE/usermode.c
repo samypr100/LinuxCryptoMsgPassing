@@ -213,6 +213,9 @@ int main(int argc, char **argv)
     // write(fd_aw, msg_2, sizeof(msg_2));
     write(fd_aw, msg_512_a, sizeof(msg_512_a));
     write(fd_aw, msg_512_b, sizeof(msg_512_b));
+    char read_msg[1025];
+    read(fd_br, read_msg, 1025);
+    printf("Read msg %s %zu\n", read_msg, strlen(read_msg));
 
     close(fd_aw);
     close(fd_bw);
