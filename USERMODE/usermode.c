@@ -413,7 +413,7 @@ int main(int argc, char **argv)
         read_msg[1024] = '\0';
         //printf("Read msg %s %zu\n", read_msg, strlen(read_msg));
 
-        if(num_read < 0){
+        if(num_read < 1){
             printf("NO DATA READ\n");
         }
 
@@ -432,7 +432,7 @@ int main(int argc, char **argv)
             // Show the decrypted text 
             printf("Decrypted text is:\n");
             printf("%s\n", decryptedtext);
-            //printf("[b] %s, decryptThingsFromB);
+            //printf("[b] %s", decryptThingsFromB);
 
         }
 
@@ -480,7 +480,7 @@ int main(int argc, char **argv)
         read_msg[1024] = '\0';
         //printf("Read msg %s %zu\n", read_msg, strlen(read_msg));
 
-        if(num_read < 0){
+        if(num_read < 1){
             printf("NO DATA READ\n");
         }
 
@@ -499,7 +499,7 @@ int main(int argc, char **argv)
             // Show the decrypted text 
             printf("Decrypted text is:\n");
             printf("%s\n", decryptedtext);
-            //printf("[b] %s, decryptThingsFromB);
+            //printf("[b] %s", decryptThingsFromB);
 
         }
 
