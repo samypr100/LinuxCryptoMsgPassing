@@ -427,7 +427,8 @@ int main(int argc, char **argv)
 
         //TODO If there is things to be read from a (data from b), read them and print to the screen
         if (num_read > 0) {
-            
+             printf("Read data:\n");
+             BIO_dump_fp (stdout, (const char *)read_msg, num_read);            
 
 
             // Decrypt the ciphertext 
@@ -500,7 +501,9 @@ int main(int argc, char **argv)
 
         //TODO If there is things to be read from a (data from b), read them and print to the screen
         if (num_read > 0) {
-            
+             printf("Read data:\n");
+             BIO_dump_fp (stdout, (const char *)read_msg, num_read);
+
 
             // Decrypt the ciphertext 
             decryptedtext_len = decrypt(read_msg, num_read, client_crypto.read_crypto_info.KEY, client_crypto.read_crypto_info.IV, decryptedtext);
