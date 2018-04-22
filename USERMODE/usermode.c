@@ -348,6 +348,7 @@ int main(int argc, char **argv)
             //Write Things
             //Take user input to send to b (write to b)
             fgets(userInput, 1024, stdin);
+            userInput[strcspn(userInput, "\r\n")] = 0; // https://stackoverflow.com/a/28462221
             printf("[me]:%s\n", userInput);
 
             ciphertext_len = encrypt(userInput, strlen((char *)userInput), client_crypto.write_crypto_info.KEY, client_crypto.write_crypto_info.IV, ciphertext);
@@ -398,7 +399,7 @@ int main(int argc, char **argv)
                 // Show the decrypted text
                 //printf("Decrypted text is:\n");
                 //printf("%s\n", decryptedtext);
-                printf("[b]:%s", decryptedtext);
+                printf("[b]:%s\n", decryptedtext);
                 //printf("[b] %s", decryptThingsFromB);
             }
 
@@ -444,6 +445,7 @@ int main(int argc, char **argv)
             //Write Things
             //Take user input to send to b (write to b)
             fgets(userInput, 1024, stdin);
+            userInput[strcspn(userInput, "\r\n")] = 0; // https://stackoverflow.com/a/28462221
             printf("[me]:%s\n", userInput);
 
             ciphertext_len = encrypt(userInput, strlen((char *)userInput), client_crypto.write_crypto_info.KEY, client_crypto.write_crypto_info.IV, ciphertext);
@@ -495,7 +497,7 @@ int main(int argc, char **argv)
                 // Show the decrypted text
                 //printf("Decrypted text is:\n");
                 //printf("%s\n", decryptedtext);
-                printf("[a]:%s", decryptedtext);
+                printf("[a]:%s\n", decryptedtext);
                 //printf("[b] %s", decryptThingsFromB);
             }
 
