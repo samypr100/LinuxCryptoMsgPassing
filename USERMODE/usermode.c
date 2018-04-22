@@ -390,10 +390,10 @@ int main(int argc, char **argv)
     read_msg[1024] = '\0';
     printf("Read msg %s %zu\n", read_msg, strlen(read_msg));
 
-//    close(fd_aw);
-//   close(fd_bw);
-//    close(fd_ar);
-//    close(fd_br);
+    close(fd_aw);
+    close(fd_bw);
+    close(fd_ar);
+    close(fd_br);
 
     cryptTest();
     //Testing Key and IV values
@@ -492,16 +492,12 @@ int main(int argc, char **argv)
         //writeToA(ciphertext);
 
 
-
-
-
-
     }
 
-    close(fd_aw);
-    close(fd_bw);
-    close(fd_ar);
-    close(fd_br);
+//    close(fd_aw);
+//    close(fd_bw);
+//    close(fd_ar);
+//    close(fd_br);
 
 
     return 0;
