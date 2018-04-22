@@ -448,8 +448,8 @@ int main(int argc, char **argv)
         fgets(userInput, 1024, stdin);
 
         ciphertext_len = encrypt(userInput, strlen((char *)userInput), client_crypto.write_crypto_info.KEY, client_crypto.write_crypto_info.IV, ciphertext);
-        //printf("Ciphertext is:\n");
-        //BIO_dump_fp (stdout, (const char *)ciphertext, ciphertext_len);
+        printf("Ciphertext is:\n");
+        BIO_dump_fp (stdout, (const char *)ciphertext, ciphertext_len);
 
         //TODO
         //writeToA(ciphertext);
@@ -509,9 +509,12 @@ int main(int argc, char **argv)
             decryptedtext[decryptedtext_len] = '\0';
 
             // Show the decrypted text 
-            printf("Decrypted text is:\n");
-            printf("%s\n", decryptedtext);
+            //printf("Decrypted text is:\n");
+            //printf("%s\n", decryptedtext);
             //printf("[b] %s", decryptThingsFromB);
+            printf("Decrypted is:\n");
+            BIO_dump_fp (stdout, (const char *)decryptedtext, decryptedtext_len);
+
 
         }
 
@@ -522,8 +525,8 @@ int main(int argc, char **argv)
 
 
         ciphertext_len = encrypt(userInput, strlen((char *)userInput), client_crypto.write_crypto_info.KEY, client_crypto.write_crypto_info.IV, ciphertext);
-        //printf("Ciphertext is:\n");
-        //BIO_dump_fp (stdout, (const char *)ciphertext, ciphertext_len);
+        printf("Ciphertext is:\n");
+        BIO_dump_fp (stdout, (const char *)ciphertext, ciphertext_len);
 
         //TODO
         //writeToA(ciphertext);
