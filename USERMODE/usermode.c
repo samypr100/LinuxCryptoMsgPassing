@@ -376,6 +376,7 @@ int main(int argc, char **argv)
 
     //User interaction structure
     if (strchr(argv[1], 'a') != NULL) {
+        
         //If user inputs a, we read from a and write to b
         //setup Encryption Info
         //For 60 seconds try to obtain key/IV
@@ -395,7 +396,7 @@ int main(int argc, char **argv)
 
         printf("Please type your input below. The recieved data from \"b\" will show up as [a]:\n");
         printf("Your input will show up as [me]:\n");
-
+        
         //Run Driver interaction
 
         //TODO If there is things to be read from a (data from b), read them and print to the screen
@@ -409,6 +410,13 @@ int main(int argc, char **argv)
         
         int num_read;
         char read_msg[1024];
+        int decryptedtext_len;
+        unsigned char decryptedtext[1024];
+        char userInput[1024];
+        int ciphertext_len;
+        unsigned char ciphertext[1024];
+
+        while(1){
         num_read = read(client_crypto.read_fd, read_msg, 1024);
         read_msg[1024] = '\0';
         //printf("Read msg %s %zu\n", read_msg, strlen(read_msg));
@@ -420,11 +428,10 @@ int main(int argc, char **argv)
         //TODO If there is things to be read from a (data from b), read them and print to the screen
         if (num_read > 0) {
             
-            int decryptedtext_len;
-            unsigned char decryptedtext[1024];
+
 
             // Decrypt the ciphertext 
-            decryptedtext_len = decrypt(read_msg, strlen ((char *)read_msg), client_crypto.read_crypto_info.KEY, client_crypto.read_crypto_info.IV, decryptedtext);
+            decryptedtext_len = decrypt(read_msg, num_read, client_crypto.read_crypto_info.KEY, client_crypto.read_crypto_info.IV, decryptedtext);
 
             // Add a NULL terminator. We are expecting printable text 
             decryptedtext[decryptedtext_len] = '\0';
@@ -438,11 +445,7 @@ int main(int argc, char **argv)
 
 
         //Take user input to send to b (write to b)
-        char userInput[1024];
         fgets(userInput, 1024, stdin);
-
-        int ciphertext_len;
-        unsigned char ciphertext[1024];
 
         ciphertext_len = encrypt(userInput, strlen((char *)userInput), client_crypto.write_crypto_info.KEY, client_crypto.write_crypto_info.IV, ciphertext);
         //printf("Ciphertext is:\n");
@@ -451,6 +454,7 @@ int main(int argc, char **argv)
         //TODO
         //writeToA(ciphertext);
         write(client_crypto.write_fd, ciphertext, ciphertext_len);
+        }
         close(client_crypto.write_fd);
         close(client_crypto.read_fd);
 
@@ -473,12 +477,19 @@ int main(int argc, char **argv)
         printf("Please type your input below. The recieved data from \"a\" will show up as [a]:\n");
         printf("Your input will show up as [me]:\n");
 
-        //Run Driver interaction
-
-        //TODO Read b
-        //thingsReadFromB = read_B();
+        int ciphertext_len;
+        unsigned char ciphertext[1024];
         int num_read;
         char read_msg[1024];
+        int decryptedtext_len;
+        unsigned char decryptedtext[1024];
+        char userInput[1024];
+
+        //Run Driver interaction
+        while(1){
+        //TODO Read b
+        //thingsReadFromB = read_B();
+
         num_read = read(client_crypto.read_fd, read_msg, 1024);
         read_msg[1024] = '\0';
         //printf("Read msg %s %zu\n", read_msg, strlen(read_msg));
@@ -490,11 +501,9 @@ int main(int argc, char **argv)
         //TODO If there is things to be read from a (data from b), read them and print to the screen
         if (num_read > 0) {
             
-            int decryptedtext_len;
-            unsigned char decryptedtext[1024];
 
             // Decrypt the ciphertext 
-            decryptedtext_len = decrypt(read_msg, strlen ((char *)read_msg), client_crypto.read_crypto_info.KEY, client_crypto.read_crypto_info.IV, decryptedtext);
+            decryptedtext_len = decrypt(read_msg, num_read, client_crypto.read_crypto_info.KEY, client_crypto.read_crypto_info.IV, decryptedtext);
 
             // Add a NULL terminator. We are expecting printable text 
             decryptedtext[decryptedtext_len] = '\0';
@@ -507,11 +516,10 @@ int main(int argc, char **argv)
         }
 
         //Take user input to send to a (write to a)
-        char userInput[1024];
+
         fgets(userInput, 1024, stdin);
 
-        int ciphertext_len;
-        unsigned char ciphertext[1024];
+
 
         ciphertext_len = encrypt(userInput, strlen((char *)userInput), client_crypto.write_crypto_info.KEY, client_crypto.write_crypto_info.IV, ciphertext);
         //printf("Ciphertext is:\n");
@@ -520,9 +528,9 @@ int main(int argc, char **argv)
         //TODO
         //writeToA(ciphertext);
         write(client_crypto.write_fd, ciphertext, ciphertext_len);
-
-       close(client_crypto.write_fd);
-       close(client_crypto.read_fd);
+        }
+        close(client_crypto.write_fd);
+        close(client_crypto.read_fd);
     }
     if (strchr(argv[1], 't') != NULL) {
 
