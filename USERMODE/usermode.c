@@ -407,27 +407,34 @@ int main(int argc, char **argv)
         //printf("[a] %s, decryptThingsFromA);
         //}
         
-        char read_msg[1025];
-        read(client_crypto.read_fd, read_msg, 1024);
+        int num_read;
+        char read_msg[1024];
+        num_read = read(client_crypto.read_fd, read_msg, 1024);
         read_msg[1024] = '\0';
         //printf("Read msg %s %zu\n", read_msg, strlen(read_msg));
 
+        if(num_read < 0){
+            printf("NO DATA READ\n");
+        }
 
-        int decryptedtext_len;
-        unsigned char decryptedtext[1025];
+        //TODO If there is things to be read from a (data from b), read them and print to the screen
+        if (num_read > 0) {
+            
+            int decryptedtext_len;
+            unsigned char decryptedtext[1024];
 
-        // Decrypt the ciphertext 
-        decryptedtext_len = decrypt(read_msg, strlen ((char *)read_msg), client_crypto.read_crypto_info.KEY, client_crypto.read_crypto_info.IV, decryptedtext);
+            // Decrypt the ciphertext 
+            decryptedtext_len = decrypt(read_msg, strlen ((char *)read_msg), client_crypto.read_crypto_info.KEY, client_crypto.read_crypto_info.IV, decryptedtext);
 
-        // Add a NULL terminator. We are expecting printable text 
-        decryptedtext[decryptedtext_len] = '\0';
+            // Add a NULL terminator. We are expecting printable text 
+            decryptedtext[decryptedtext_len] = '\0';
 
-        // Show the decrypted text 
-        printf("Decrypted text is:\n");
-        printf("%s\n", decryptedtext);
-        //printf("[b] %s, decryptThingsFromB);
+            // Show the decrypted text 
+            printf("Decrypted text is:\n");
+            printf("%s\n", decryptedtext);
+            //printf("[b] %s, decryptThingsFromB);
 
-
+        }
 
 
         //Take user input to send to b (write to b)
@@ -465,18 +472,23 @@ int main(int argc, char **argv)
 
         //Run Driver interaction
 
-        //TODO If there is things to be read from a (data from b), read them and print to the screen
-        if (1) {
-            //TODO Read b
-            //thingsReadFromB = read_B();
-            char read_msg[1025];
-            read(client_crypto.read_fd, read_msg, 1024);
-            read_msg[1024] = '\0';
-            //printf("Read msg %s %zu\n", read_msg, strlen(read_msg));
+        //TODO Read b
+        //thingsReadFromB = read_B();
+        int num_read;
+        char read_msg[1024];
+        num_read = read(client_crypto.read_fd, read_msg, 1024);
+        read_msg[1024] = '\0';
+        //printf("Read msg %s %zu\n", read_msg, strlen(read_msg));
 
+        if(num_read < 0){
+            printf("NO DATA READ\n");
+        }
+
+        //TODO If there is things to be read from a (data from b), read them and print to the screen
+        if (num_read > 0) {
             
             int decryptedtext_len;
-            unsigned char decryptedtext[1025];
+            unsigned char decryptedtext[1024];
 
             // Decrypt the ciphertext 
             decryptedtext_len = decrypt(read_msg, strlen ((char *)read_msg), client_crypto.read_crypto_info.KEY, client_crypto.read_crypto_info.IV, decryptedtext);
