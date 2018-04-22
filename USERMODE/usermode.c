@@ -26,6 +26,7 @@
 #include <openssl/aes.h>
 #include <openssl/evp.h>
 #include <openssl/rand.h>
+#include <openssl/err.h>
 
 // SMATOS2, EFORTE3 Structure Per Client
 struct jhu_crypto_client {
@@ -42,7 +43,7 @@ struct jhu_crypto_client {
 void handleErrors(void)
 {
     printf("An error occured with the encryption, and my error handling is bad\n");
-    //ERR_print_errors_fp(stderr);
+    ERR_print_errors_fp(stderr);
     //printf(stderr);
     abort();
 }
@@ -58,6 +59,7 @@ int encrypt(unsigned char *plaintext, int plaintext_len, unsigned char *key,
 
     /* Create and initialise the context */
     if (!(ctx = EVP_CIPHER_CTX_new())) {
+        printf("Error on Initlaizing the encryption Context\n");
         handleErrors();
     }
 
@@ -67,12 +69,14 @@ int encrypt(unsigned char *plaintext, int plaintext_len, unsigned char *key,
      * IV size for *most* modes is the same as the block size. For AES this
      * is 128 bits */
     if (1 != EVP_EncryptInit_ex(ctx, EVP_aes_256_cbc(), NULL, key, iv)) {
+        printf("Error on Initializing encryption operation\n");
         handleErrors();
     }
     /* Provide the message to be encrypted, and obtain the encrypted output.
      * EVP_EncryptUpdate can be called multiple times if necessary
      */
     if (1 != EVP_EncryptUpdate(ctx, ciphertext, &len, plaintext, plaintext_len)) {
+        printf("Error on add adding message to be encrypted\n");
         handleErrors();
     }
 
@@ -82,6 +86,7 @@ int encrypt(unsigned char *plaintext, int plaintext_len, unsigned char *key,
      * this stage.
      */
     if (1 != EVP_EncryptFinal_ex(ctx, ciphertext + len, &len)) {
+        printf("Error on add final encryption bytes\n");
         handleErrors();
     }
 
@@ -104,6 +109,7 @@ int decrypt(unsigned char *ciphertext, int ciphertext_len, unsigned char *key,
 
     /* Create and initialise the context */
     if (!(ctx = EVP_CIPHER_CTX_new()))
+        printf("Error on Initlaizing the decrypiton Context\n");
         handleErrors();
 
     /* Initialise the decryption operation. IMPORTANT - ensure you use a key
@@ -112,6 +118,7 @@ int decrypt(unsigned char *ciphertext, int ciphertext_len, unsigned char *key,
     * IV size for *most* modes is the same as the block size. For AES this
     * is 128 bits */
     if (1 != EVP_DecryptInit_ex(ctx, EVP_aes_256_cbc(), NULL, key, iv)) {
+        printf("Error on Initlaizing the decrypiton operation\n");
         handleErrors();
     }
 
@@ -119,6 +126,7 @@ int decrypt(unsigned char *ciphertext, int ciphertext_len, unsigned char *key,
     * EVP_DecryptUpdate can be called multiple times if necessary
     */
     if (1 != EVP_DecryptUpdate(ctx, plaintext, &len, ciphertext, ciphertext_len)) {
+        printf("Error on adding message to be decrypted\n");
         handleErrors();
     }
 
@@ -129,6 +137,7 @@ int decrypt(unsigned char *ciphertext, int ciphertext_len, unsigned char *key,
     */
 
     if (1 != EVP_DecryptFinal_ex(ctx, plaintext + len, &len)) {
+        printf("Error on adding final decrytped bytes\n");
         handleErrors();
     }
 
