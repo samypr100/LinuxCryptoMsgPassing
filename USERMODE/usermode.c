@@ -451,6 +451,9 @@ int main(int argc, char **argv)
         //TODO
         //writeToA(ciphertext);
         write(client_crypto.write_fd, ciphertext, ciphertext_len);
+        close(client_crypto.write_fd);
+        close(client_crypto.read_fd);
+
     }
 
     if (strchr(argv[1], 'b') != NULL) {
@@ -517,6 +520,9 @@ int main(int argc, char **argv)
         //TODO
         //writeToA(ciphertext);
         write(client_crypto.write_fd, ciphertext, ciphertext_len);
+
+       close(client_crypto.write_fd);
+       close(client_crypto.read_fd);
     }
     if (strchr(argv[1], 't') != NULL) {
 
@@ -656,6 +662,7 @@ int main(int argc, char **argv)
         close(fd_ar);
         close(fd_br);
     }
+
 
     return 0;
 }
