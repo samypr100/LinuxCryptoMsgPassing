@@ -56,6 +56,8 @@ static int g_majornum_a;                        // Holds MajorNum for Device A
 static int g_majornum_b;                        // Holds MajorNum for Device B
 static char g_msg_a[MAX_ALLOWED_MESSAGE] = {0}; // should hold 1024 1-byte characters (0-1023) + null terminator (1024)
 static char g_msg_b[MAX_ALLOWED_MESSAGE] = {0}; // should hold 1024 1-byte characters (0-1023) + null terminator (1024)
+static int g_offset_a = 0;                      // Serve's as the seek for g_msg_a to know up to where it has been written to.
+static int g_offset_b = 0;                      // Serve's as the seek for g_msg_b to know up to where it has been written to.
 static struct jhu_ioctl_crypto g_crypto_info_a; // Holds Crypto Info for Device A
 static struct jhu_ioctl_crypto g_crypto_info_b; // Holds Crypto Info for Device B
 static DEFINE_MUTEX(g_lock_a);                  // Holds Global Lock for Device A
@@ -100,6 +102,7 @@ struct dev_private_data {
     bool is_iv_initialized;                  // Use to determine if this Device has IV Information
     int major;                               // This Device Major Num
     int minor;                               // This Device Minor Num
+    int *current_offset;                     // Holds Reference to the Global Message Seek for the Proper Device
     char *current_msg;                       // Holds Reference to the Global Message for the Proper Device
     struct mutex *current_lock;              // Holds Reference to the Global Lock for the Proper Device
     struct jhu_ioctl_crypto *current_crypto; // Holds Reference to the Global Crypto Info for the Proper Device
@@ -281,12 +284,14 @@ static int dev_open(struct inode *inodep, struct file *filep)
     if (priv_data->major == g_majornum_a) {
         priv_data->current_crypto = &g_crypto_info_a;
         priv_data->current_lock = &g_lock_a;
+        priv_data->current_offset = &g_offset_a;
         priv_data->current_msg = g_msg_a;
     }
 
     if (priv_data->major == g_majornum_b) {
         priv_data->current_crypto = &g_crypto_info_b;
         priv_data->current_lock = &g_lock_b;
+        priv_data->current_offset = &g_offset_b;
         priv_data->current_msg = g_msg_b;
     }
 
@@ -312,6 +317,7 @@ static ssize_t dev_read(struct file *filep, char *buffer, size_t len, loff_t *of
     char *buf;
     int max_len_to_read;
     int error = 0;
+    int i = 0;
     bool can_read;
     struct dev_private_data *priv_data = filep->private_data; // device should be opened at this stage...
 
@@ -338,7 +344,7 @@ static ssize_t dev_read(struct file *filep, char *buffer, size_t len, loff_t *of
     // atomic operation start
     mutex_lock(priv_data->current_lock);
 
-    max_len_to_read = strlen(priv_data->current_msg);
+    max_len_to_read = *priv_data->current_offset;
 
     printk(KERN_INFO "[*]    Current Stored Message Size %d\n", max_len_to_read);
 
@@ -355,8 +361,12 @@ static ssize_t dev_read(struct file *filep, char *buffer, size_t len, loff_t *of
         mutex_unlock(priv_data->current_lock);
         return -ENOMEM;
     }
-    strncpy(buf, priv_data->current_msg, max_len_to_read);
-    buf[max_len_to_read] = '\0'; // make sure it's null terminated
+
+    for (i = 0; i < max_len_to_read; i++) {
+        buf[i] = priv_data->current_msg[i];
+    }
+
+    buf[max_len_to_read] = '\0'; // make sure it's null terminated // TODO: Don't treat this as string, remove and fix msg size
     error = copy_to_user(buffer, buf, max_len_to_read + 1);
     if (error) {
         kfree(buf);
@@ -365,11 +375,12 @@ static ssize_t dev_read(struct file *filep, char *buffer, size_t len, loff_t *of
     }
 
     printk(KERN_INFO "[*]    STORED MSG:\n");
-    print_hex_dump(KERN_INFO, "[*]    ", DUMP_PREFIX_NONE, 16, 1, buf, max_len_to_read + 1, true);
+    print_hex_dump(KERN_INFO, "[*]    ", DUMP_PREFIX_NONE, 16, 1, buf, max_len_to_read, true);
 
     // clear out stored message
     // TODO: should we partition message after read (e.g. shift the non-read bytes at the beggining of the file)
     memset(priv_data->current_msg, 0, MAX_ALLOWED_MESSAGE);
+    (*priv_data->current_offset) = 0;
 
     kfree(buf);
     mutex_unlock(priv_data->current_lock);
@@ -386,6 +397,8 @@ static ssize_t dev_write(struct file *filep, const char *buffer, size_t len, lof
 
     // https://github.com/torvalds/linux/blob/v4.15/kernel/printk/printk.c#L756
     char *buf;
+    int i = 0;
+    int seek = 0;
     int error = 0;
     bool can_write;
     int curr_space_left;
@@ -426,7 +439,7 @@ static ssize_t dev_write(struct file *filep, const char *buffer, size_t len, lof
 
     mutex_lock(priv_data->current_lock);
 
-    curr_space_left = MAX_ALLOWED_MESSAGE - strlen(priv_data->current_msg); // fyi: when full, curr_space_left should be 1
+    curr_space_left = MAX_ALLOWED_MESSAGE - *priv_data->current_offset; // fyi: when full, curr_space_left should be 1
 
     printk(KERN_INFO "[*]    Current Space left to write is %d\n", curr_space_left);
 
@@ -436,11 +449,19 @@ static ssize_t dev_write(struct file *filep, const char *buffer, size_t len, lof
         return -E2BIG;
     }
 
-    strncat(priv_data->current_msg, buf, len);
-    priv_data->current_msg[MAX_ALLOWED_MESSAGE] = '\0'; // make sure it's null terminated... always.
+    for (i = 0; i < len; i++) {
+        priv_data->current_msg[i + *priv_data->current_offset] = buf[i];
+        seek++;
+    }
+    (*priv_data->current_offset) += seek;
     kfree(buf);
 
+    priv_data->current_msg[MAX_ALLOWED_MESSAGE] = '\0'; // make sure it's null terminated... always. // TODO: Don't treat this as string, remove and fix msg size
     printk(KERN_INFO "[*]    Wrote %zu bytes. \n", len);
+
+    curr_space_left = MAX_ALLOWED_MESSAGE - *priv_data->current_offset; // fyi: when full, curr_space_left should be 1
+    printk(KERN_INFO "[*]    Current Space left to write is %d\n", curr_space_left);
+
     printk(KERN_INFO "[*]    STORED MSG:\n");
     print_hex_dump(KERN_INFO, "[*]    ", DUMP_PREFIX_NONE, 16, 1, priv_data->current_msg, MAX_ALLOWED_MESSAGE, true);
 
