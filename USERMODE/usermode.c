@@ -18,6 +18,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+#include <signal.h>
 //
 // This header is required for the ioctl() call
 #include <sys/ioctl.h>
@@ -38,6 +39,15 @@ struct jhu_crypto_client {
     struct jhu_ioctl_crypto read_crypto_info;
     struct jhu_ioctl_crypto write_crypto_info;
 } __attribute__((__packed__));
+
+//https://stackoverflow.com/questions/4217037/catch-ctrl-c-in-c
+//void sigint_handler(int);
+
+void sigint_handler(int sig){
+    printf("\nQuiting process %d\n", getpid());
+    exit(0);
+}
+
 
 // SMATOS2, EFORTE3 Taken/Mofified from https://wiki.openssl.org/index.php/EVP_Symmetric_Encryption_and_Decryption#Encrypting_the_message
 int encrypt(unsigned char *plaintext, int plaintext_len, unsigned char *key, unsigned char *iv, unsigned char *ciphertext)
@@ -306,6 +316,10 @@ int main(int argc, char **argv)
 
     char devname_a[32];
     char devname_b[32];
+
+    
+    signal(SIGINT, sigint_handler);
+
 
     if (argc < 2 || argv[1] == NULL) {
         printf("Usage: ./myuser [a or b or t (test)] \n");
