@@ -390,10 +390,10 @@ int main(int argc, char **argv)
     read_msg[1024] = '\0';
     printf("Read msg %s %zu\n", read_msg, strlen(read_msg));
 
-    close(fd_aw);
-    close(fd_bw);
-    close(fd_ar);
-    close(fd_br);
+//    close(fd_aw);
+//   close(fd_bw);
+//    close(fd_ar);
+//    close(fd_br);
 
     cryptTest();
     //Testing Key and IV values
@@ -447,6 +447,7 @@ int main(int argc, char **argv)
     }
     if(strchr(argv[1],'b') != NULL)
     {
+        //If user inputs B then we read b write a
         printf("b is ready\n\n");
         printf("Please type your input below. The recieved data from \"a\" will show up as [a]:\n");
         printf("Your input will show up as [me]:\n"); 
@@ -454,32 +455,53 @@ int main(int argc, char **argv)
         //Run Driver interaction
 
         //TODO If there is things to be read from a (data from b), read them and print to the screen
-        //if(thingsReadFromA)
-        //{
-            //thingsReadFromB = read_b();
-            //printf("[b] %s, thingsReadFromB);
-            //decryptThingsFromB = decryptD(thingsReadFromB, IV_B);
+        if(1)
+        {
+            //TODO Read b
+            //thingsReadFromA = read_B();
+
+/*
+            int decryptedtext_len;
+            unsigned char decryptedtext[512];
+
+            // Decrypt the ciphertext 
+            decryptedtext_len = decrypt(thingsFromB, strlen ((char *)thingsFromB), key, iv, decryptedtext);
+
+            // Add a NULL terminator. We are expecting printable text 
+            decryptedtext[decryptedtext_len] = '\0';
+
+            // Show the decrypted text 
+            printf("Decrypted text is:\n");
+            printf("%s\n", decryptedtext);
             //printf("[b] %s, decryptThingsFromB);
-        //}
+*/
+        }
         
         //Take user input to send to a (write to a)
         char userInput[512];
         fgets(userInput, 512, stdin);
        
         int ciphertext_len;
-        unsigned char ciphertext[128];
+        unsigned char ciphertext[512];
 
-        ciphertext_len = encrypt (userInput, strlen ((char *)userInput), key, iv, ciphertext);
+        ciphertext_len = encrypt(userInput, strlen ((char *)userInput), key, iv, ciphertext);
         //printf("Ciphertext is:\n");
         //BIO_dump_fp (stdout, (const char *)ciphertext, ciphertext_len);
 
         //TODO 
         //writeToA(ciphertext);
 
+
+
+
+
+
     }
 
-
-
+    close(fd_aw);
+    close(fd_bw);
+    close(fd_ar);
+    close(fd_br);
 
 
     return 0;
