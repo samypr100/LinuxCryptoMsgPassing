@@ -27,7 +27,7 @@
 // Required for the copy to user function
 #include <linux/uaccess.h>
 
-// Memory Allocation
+// SMATOS2, EFORTE3 Memory Allocation
 #include <linux/slab.h>
 
 // Using a common header file for usermode/kernel mode code
@@ -49,16 +49,17 @@ MODULE_VERSION("4.0.2018");
 // You will need to modify these in order to complete the assignment
 //
 
-#define MAX_ALLOWED_LEN 16
-#define MAX_ALLOWED_MESSAGE 1024 + 1 // Account for null terminator as well...
+// Define Max Message Size
+#define MAX_ALLOWED_MESSAGE 1024 + 1 // Account for null terminator as well... (e.g [0-1023] are chars, [1024] = 0)
 
-static int g_majornum_a;
-static int g_majornum_b;
-static char g_buffer[MAX_ALLOWED_LEN] = {0};
-static char msg_a[MAX_ALLOWED_MESSAGE] = {0}; // should hold 1024 1-byte characters + null terminator
-static char msg_b[MAX_ALLOWED_MESSAGE] = {0}; // should hold 1024 1-byte characters + null terminator
-static struct jhu_ioctl_crypto evp_a;
-static struct jhu_ioctl_crypto evp_b;
+static int g_majornum_a;                        // Holds MajorNum for Device A
+static int g_majornum_b;                        // Holds MajorNum for Device B
+static char g_msg_a[MAX_ALLOWED_MESSAGE] = {0}; // should hold 1024 1-byte characters (0-1023) + null terminator (1024)
+static char g_msg_b[MAX_ALLOWED_MESSAGE] = {0}; // should hold 1024 1-byte characters (0-1023) + null terminator (1024)
+static struct jhu_ioctl_crypto g_crypto_info_a; // Holds Crypto Info for Device A
+static struct jhu_ioctl_crypto g_crypto_info_b; // Holds Crypto Info for Device B
+static DEFINE_MUTEX(g_lock_a);                  // Holds Global Lock for Device A
+static DEFINE_MUTEX(g_lock_b);                  // Holds Global Lock for Device B
 
 static struct class *jhu_oss_class = NULL;
 static struct device *jhu_oss_device_a = NULL;
@@ -89,17 +90,19 @@ static struct file_operations fops =
         .release = dev_release,
 };
 
-/*
- * SMATOS2, EFORTE3 per-device data
- */
+//
+// SMATOS2, EFORTE3 per-device data
+//
 struct dev_private_data {
-    bool is_open_for_read;
-    bool is_open_for_write;
-    bool is_key_initialized;
-    bool is_iv_initialized;
-    int major;
-    int minor;
-    struct mutex lock;
+    bool is_open_for_read;                   // Use to determine if this Device is Opened for Read
+    bool is_open_for_write;                  // Use to determine if this Device is Opened for Write
+    bool is_key_initialized;                 // Use to determine if this Device has Key Information
+    bool is_iv_initialized;                  // Use to determine if this Device has IV Information
+    int major;                               // This Device Major Num
+    int minor;                               // This Device Minor Num
+    char *current_msg;                       // Holds Reference to the Global Message for the Proper Device
+    struct mutex *current_lock;              // Holds Reference to the Global Lock for the Proper Device
+    struct jhu_ioctl_crypto *current_crypto; // Holds Reference to the Global Crypto Info for the Proper Device
     // ...
 };
 
@@ -140,6 +143,7 @@ static int __init jhu_oss_char_init(void)
     g_majornum_b = register_chrdev(0, DEVICE_NAME_B, &fops);
 
     if (g_majornum_b < 0) {
+        unregister_chrdev(g_majornum_a, DEVICE_NAME_A);
         return g_majornum_b;
     }
 
@@ -175,22 +179,28 @@ static int __init jhu_oss_char_init(void)
     // NOTE:
     // The MKDEV takes a major/minor pair and creates an appropriate device number
     //
+
+    // Create Device A
     jhu_oss_device_a = device_create(jhu_oss_class, NULL, MKDEV(g_majornum_a, 0), NULL, DEVICE_NAME_A);
+
+    if (IS_ERR(jhu_oss_device_a)) {
+        class_destroy(jhu_oss_class);                   // Destroy and Unregister Class
+        unregister_chrdev(g_majornum_a, DEVICE_NAME_A); // Unregister Device A...
+        unregister_chrdev(g_majornum_b, DEVICE_NAME_B); // Unregister Device B...
+        printk(KERN_WARNING "[-] Failed to create Device A\n");
+        return PTR_ERR(jhu_oss_device_a);
+    }
+
+    // Create Device B
     jhu_oss_device_b = device_create(jhu_oss_class, NULL, MKDEV(g_majornum_b, 0), NULL, DEVICE_NAME_B);
 
-    if (IS_ERR(jhu_oss_device_a) || IS_ERR(jhu_oss_device_b)) {
-        class_destroy(jhu_oss_class);
-
-        unregister_chrdev(g_majornum_a, DEVICE_NAME_A);
-        unregister_chrdev(g_majornum_b, DEVICE_NAME_B);
-
-        printk(KERN_WARNING "[-] Failed to create device class\n");
-
-        if (IS_ERR(jhu_oss_device_a)) {
-            return PTR_ERR(jhu_oss_device_a);
-        } else {
-            return PTR_ERR(jhu_oss_device_b);
-        }
+    if (IS_ERR(jhu_oss_device_b)) {
+        device_destroy(jhu_oss_class, MKDEV(g_majornum_a, 0)); // Destroy Device A since it got created...
+        class_destroy(jhu_oss_class);                          // Destroy and Unregister Class
+        unregister_chrdev(g_majornum_a, DEVICE_NAME_A);        // Unregister Device A...
+        unregister_chrdev(g_majornum_b, DEVICE_NAME_B);        // Unregister Device B...
+        printk(KERN_WARNING "[-] Failed to create Device B\n");
+        return PTR_ERR(jhu_oss_device_b);
     }
 
     printk(KERN_INFO "[+] Module successfully initialized\n");
@@ -212,9 +222,9 @@ static void __exit jhu_oss_char_exit(void)
     device_destroy(jhu_oss_class, MKDEV(g_majornum_b, 0));
 
     //
-    // unregister the class
+    // destroy and unregister the class
     //
-    class_unregister(jhu_oss_class);
+    class_destroy(jhu_oss_class);
 
     //
     // unregister the character device
@@ -227,7 +237,7 @@ static int dev_open(struct inode *inodep, struct file *filep)
 {
 
     struct dev_private_data *priv_data = filep->private_data;
-    bool is_open_read, is_open_write, is_open_valid;
+    bool is_open_read, is_open_write, is_open_valid, is_valid_device;
     //
     // Add your checking to this code path
     //
@@ -236,7 +246,7 @@ static int dev_open(struct inode *inodep, struct file *filep)
     // SMATOS2, EFORTE3
     // Check Capability before allowing open
     if (!capable(CAP_SECRET_FOURONETWO)) {
-        printk(KERN_WARNING "[*]    Invalid Capability");
+        printk(KERN_WARNING "[*]    Invalid Capability\n");
         //return -EPERM; TODO UNCOMMENT ME TO ENFOCE THIS LATER AFTER FINALIZING THE MODULE
     }
 
@@ -246,12 +256,19 @@ static int dev_open(struct inode *inodep, struct file *filep)
     is_open_write = (filep->f_mode & FMODE_WRITE) == FMODE_WRITE;
     is_open_valid = (is_open_read || is_open_write) && !(is_open_read && is_open_write);
     if (!is_open_valid) {
-        printk(KERN_WARNING "[*]    Invalid Open Mode");
+        printk(KERN_WARNING "[*]    Invalid Open Mode\n");
         return -EINVAL;
     }
 
+    // I'm being extremely paranoid
+    is_valid_device = (imajor(inodep) == g_majornum_a) ? true : (imajor(inodep) == g_majornum_b) ? true : false;
+    if (!is_valid_device) {
+        printk(KERN_WARNING "[*]    Invalid Device\n");
+        return -EBADFD;
+    }
+
     // Initialize priv_data for particular device file decriptor
-    printk(KERN_INFO "[*]    Initializing State");
+    printk(KERN_INFO "[*]    Initializing State\n");
     priv_data = kzalloc(sizeof(struct dev_private_data), GFP_KERNEL);
     if (!priv_data) {
         return -ENOMEM;
@@ -260,7 +277,18 @@ static int dev_open(struct inode *inodep, struct file *filep)
     priv_data->minor = iminor(inodep); // if we decide to use it...
     priv_data->is_open_for_read = is_open_read ? true : false;
     priv_data->is_open_for_write = is_open_write ? true : false;
-    mutex_init(&priv_data->lock);
+
+    if (priv_data->major == g_majornum_a) {
+        priv_data->current_crypto = &g_crypto_info_a;
+        priv_data->current_lock = &g_lock_a;
+        priv_data->current_msg = g_msg_a;
+    }
+
+    if (priv_data->major == g_majornum_b) {
+        priv_data->current_crypto = &g_crypto_info_b;
+        priv_data->current_lock = &g_lock_b;
+        priv_data->current_msg = g_msg_b;
+    }
 
     printk(KERN_INFO "[*]    Successfully Opened Device\n");
     printk(KERN_INFO "[*]    Init State {isRead: %d, isWrite: %d, isKey: %d, isIV: %d, major: %d, minor: %d}\n",
@@ -286,8 +314,6 @@ static ssize_t dev_read(struct file *filep, char *buffer, size_t len, loff_t *of
     int error = 0;
     bool can_read;
     struct dev_private_data *priv_data = filep->private_data; // device should be opened at this stage...
-    struct jhu_ioctl_crypto *correct_device = NULL;
-    char *correct_msg = NULL;
 
     printk(KERN_INFO "[*] Usermode is requesting %zu chars from kernelmode\n", len);
 
@@ -303,17 +329,6 @@ static ssize_t dev_read(struct file *filep, char *buffer, size_t len, loff_t *of
         return -EAGAIN;
     }
 
-    // verify what device we're writing to
-    if (priv_data->major == g_majornum_a) {
-        correct_device = &evp_a;
-        correct_msg = msg_a;
-    } else if (priv_data->major == g_majornum_b) {
-        correct_device = &evp_b;
-        correct_msg = msg_b;
-    } else {
-        return -EFAULT;
-    }
-
     // make sure that the user doesn't attempt to read more than 1024 bytes at a time
     if (len > MAX_ALLOWED_MESSAGE) {
         printk(KERN_WARNING "[*]    Message to read is too long.\n");
@@ -321,9 +336,9 @@ static ssize_t dev_read(struct file *filep, char *buffer, size_t len, loff_t *of
     }
 
     // atomic operation start
-    mutex_lock(&priv_data->lock);
+    mutex_lock(priv_data->current_lock);
 
-    max_len_to_read = strlen(correct_msg);
+    max_len_to_read = strlen(priv_data->current_msg);
 
     printk(KERN_INFO "[*]    Current Stored Message Size %d\n", max_len_to_read);
 
@@ -337,26 +352,27 @@ static ssize_t dev_read(struct file *filep, char *buffer, size_t len, loff_t *of
     // allocate internal buffer to copy data to
     buf = kzalloc(max_len_to_read + 1, GFP_KERNEL);
     if (buf == NULL) {
-        mutex_unlock(&priv_data->lock);
+        mutex_unlock(priv_data->current_lock);
         return -ENOMEM;
     }
-    strncpy(buf, correct_msg, max_len_to_read);
+    strncpy(buf, priv_data->current_msg, max_len_to_read);
     buf[max_len_to_read] = '\0'; // make sure it's null terminated
     error = copy_to_user(buffer, buf, max_len_to_read + 1);
     if (error) {
         kfree(buf);
-        mutex_unlock(&priv_data->lock);
+        mutex_unlock(priv_data->current_lock);
         return -EFAULT;
     }
 
-    print_hex_dump(KERN_INFO, "[*]    MSG READ: ", DUMP_PREFIX_NONE, 16, 1, buf, max_len_to_read + 1, true);
+    printk(KERN_INFO "[*]    STORED MSG:\n");
+    print_hex_dump(KERN_INFO, "[*]    ", DUMP_PREFIX_NONE, 16, 1, buf, max_len_to_read + 1, true);
 
     // clear out stored message
     // TODO: should we partition message after read (e.g. shift the non-read bytes at the beggining of the file)
-    memset(correct_msg, 0, MAX_ALLOWED_MESSAGE);
+    memset(priv_data->current_msg, 0, MAX_ALLOWED_MESSAGE);
 
     kfree(buf);
-    mutex_unlock(&priv_data->lock);
+    mutex_unlock(priv_data->current_lock);
 
     return max_len_to_read;
 }
@@ -374,8 +390,6 @@ static ssize_t dev_write(struct file *filep, const char *buffer, size_t len, lof
     bool can_write;
     int curr_space_left;
     struct dev_private_data *priv_data = filep->private_data; // device should be opened at this stage...
-    struct jhu_ioctl_crypto *correct_device = NULL;
-    char *correct_msg = NULL;
 
     printk(KERN_INFO "[*] Usermode is writing %zu chars to usermode\n", len);
 
@@ -389,17 +403,6 @@ static ssize_t dev_write(struct file *filep, const char *buffer, size_t len, lof
     if (!can_write) {
         printk(KERN_WARNING "[*]    Unable to write data because state is not ready.\n");
         return -EAGAIN;
-    }
-
-    // verify what device we're writing to
-    if (priv_data->major == g_majornum_a) {
-        correct_device = &evp_a;
-        correct_msg = msg_a;
-    } else if (priv_data->major == g_majornum_b) {
-        correct_device = &evp_b;
-        correct_msg = msg_b;
-    } else {
-        return -EFAULT;
     }
 
     // make sure that the user doesn't attempt to write more than 1024 bytes at a time
@@ -421,38 +424,35 @@ static ssize_t dev_write(struct file *filep, const char *buffer, size_t len, lof
         return -EFAULT;
     }
 
-    mutex_lock(&priv_data->lock);
+    mutex_lock(priv_data->current_lock);
 
-    curr_space_left = MAX_ALLOWED_MESSAGE - strlen(correct_msg); // fyi: when full, curr_space_left should be 1
+    curr_space_left = MAX_ALLOWED_MESSAGE - strlen(priv_data->current_msg); // fyi: when full, curr_space_left should be 1
 
     printk(KERN_INFO "[*]    Current Space left to write is %d\n", curr_space_left);
 
     if (len > curr_space_left) {
         kfree(buf);
-        mutex_unlock(&priv_data->lock);
+        mutex_unlock(priv_data->current_lock);
         return -E2BIG;
     }
 
-    strncat(correct_msg, buf, len);
-    correct_msg[MAX_ALLOWED_MESSAGE] = '\0'; // make sure it's null terminated... always.
+    strncat(priv_data->current_msg, buf, len);
+    priv_data->current_msg[MAX_ALLOWED_MESSAGE] = '\0'; // make sure it's null terminated... always.
     kfree(buf);
 
     printk(KERN_INFO "[*]    Wrote %zu bytes. \n", len);
-    print_hex_dump(KERN_INFO, "[*]    CURR MSG: ", DUMP_PREFIX_NONE, 16, 1, correct_msg, MAX_ALLOWED_MESSAGE, true);
+    printk(KERN_INFO "[*]    STORED MSG:\n");
+    print_hex_dump(KERN_INFO, "[*]    ", DUMP_PREFIX_NONE, 16, 1, priv_data->current_msg, MAX_ALLOWED_MESSAGE, true);
 
-    mutex_unlock(&priv_data->lock);
+    mutex_unlock(priv_data->current_lock);
 
     return len;
 }
 
 long dev_ioctl(struct file *filep, unsigned int ioctl_num, unsigned long ioctl_param)
 {
-    int i = 0;
     int error = 0;
-    char *temp = NULL;
-    struct jhu_ioctl_crypto *correct_evp = NULL;
     struct jhu_ioctl_crypto __user *temp_evp = NULL;
-    char ch;
     struct dev_private_data *priv_data = filep->private_data; // device should be opened at this stage...
 
     // better safe than sorry
@@ -463,99 +463,60 @@ long dev_ioctl(struct file *filep, unsigned int ioctl_num, unsigned long ioctl_p
     printk(KERN_INFO "[*] Usermode is requesting %08x ioctl\n", ioctl_num);
 
     switch (ioctl_num) {
-    case IOCTL_READ_FROM_KERNEL:
-        printk(KERN_INFO "[*]    IOCTL_READ_FROM_KERNEL\n");
-        //
-        //  The code below is not safe..be sure to fix it properly
-        //  if you use it
-        //
-        temp = (char *)ioctl_param;
-        error = copy_to_user(temp, g_buffer, MAX_ALLOWED_LEN);
-        if (error)
-            return -EFAULT;
-        printk(KERN_INFO "[+]    The message is %s\n", g_buffer);
-
-        break;
-
-    case IOCTL_WRITE_TO_KERNEL:
-        printk(KERN_INFO "[*]    IOCTL_WRITE_TO_KERNEL\n");
-        temp = (char *)ioctl_param;
-        get_user(ch, temp);
-        for (i = 0; ch && i < MAX_ALLOWED_LEN; i++, temp++)
-            get_user(ch, temp);
-
-        //
-        //  The code below is not safe..be sure to fix it properly
-        //  if you use it
-        //
-        memset(g_buffer, 0, MAX_ALLOWED_LEN);
-        error = copy_from_user(g_buffer, (char *)ioctl_param, i);
-        if (error) {
-            return -EFAULT;
-        }
-
-        printk(KERN_INFO "[+]    The length passed in is %d\n", i);
-        printk(KERN_INFO "[+]    The message is %s\n", g_buffer);
-
-        break;
     case IOCTL_READ_FROM_KERNEL_EVP:
-        printk(KERN_INFO "[*]    IOCTL_READ_FROM_KERNEL_EVP\n");
+        printk(KERN_INFO "[*]    IOCTL_READ_FROM_KERNEL\n");
         temp_evp = (struct jhu_ioctl_crypto *)ioctl_param;
 
-        if (priv_data->major == g_majornum_a) {
-            correct_evp = &evp_a;
-        } else if (priv_data->major == g_majornum_b) {
-            correct_evp = &evp_b;
-        } else {
-            return -ENOENT;
-        }
-
         // TODO we should check if it's null terminated on WRITE
-        if (strlen(correct_evp->KEY) != JHU_IOCTL_CRYPTO_KEY_CHAR_LEN - 1) {
+        // strlen returns len w/o null terminator
+        if (strlen(priv_data->current_crypto->KEY) != JHU_IOCTL_CRYPTO_KEY_CHAR_LEN - 1) {
             printk(KERN_WARNING "[*]    KEY not initialized properly\n");
             return -EAGAIN;
         }
 
         // TODO we should check if it's null terminated on WRITE
-        if (strlen(correct_evp->IV) != JHU_IOCTL_CRYPTO_IV_CHAR_LEN - 1) {
+        // strlen returns len w/o null terminator
+        if (strlen(priv_data->current_crypto->IV) != JHU_IOCTL_CRYPTO_IV_CHAR_LEN - 1) {
             printk(KERN_WARNING "[*]    IV not initialized properly\n");
             return -EAGAIN;
         }
 
-        error = copy_to_user(temp_evp->KEY, correct_evp->KEY, JHU_IOCTL_CRYPTO_KEY_CHAR_LEN);
+        error = copy_to_user(temp_evp->KEY, priv_data->current_crypto->KEY, JHU_IOCTL_CRYPTO_KEY_CHAR_LEN);
         if (error) {
             return -EFAULT;
         }
         priv_data->is_key_initialized = true;
 
-        error = copy_to_user(temp_evp->IV, correct_evp->IV, JHU_IOCTL_CRYPTO_IV_CHAR_LEN);
+        error = copy_to_user(temp_evp->IV, priv_data->current_crypto->IV, JHU_IOCTL_CRYPTO_IV_CHAR_LEN);
         if (error) {
+            priv_data->is_key_initialized = false;
             return -EFAULT;
         }
         priv_data->is_iv_initialized = true;
 
-        print_hex_dump(KERN_INFO, "[*]    KEY READ ", DUMP_PREFIX_NONE, 16, 1, correct_evp->KEY, JHU_IOCTL_CRYPTO_KEY_CHAR_LEN, true);
-        print_hex_dump(KERN_INFO, "[*]    IV READ ", DUMP_PREFIX_NONE, 16, 1, correct_evp->IV, JHU_IOCTL_CRYPTO_IV_CHAR_LEN, true);
+        printk(KERN_INFO "[*]    KEY READ\n");
+        print_hex_dump(KERN_INFO, "[*]    ", DUMP_PREFIX_NONE, 16, 1, priv_data->current_crypto->KEY, JHU_IOCTL_CRYPTO_KEY_CHAR_LEN, true);
+        printk(KERN_INFO "[*]    IV READ\n");
+        print_hex_dump(KERN_INFO, "[*]    ", DUMP_PREFIX_NONE, 16, 1, priv_data->current_crypto->IV, JHU_IOCTL_CRYPTO_IV_CHAR_LEN, true);
+
+        // Clear Data Remnants (Prevents Unstable Write/Read)
+        // TODO Should we do this?
+        memset(priv_data->current_crypto->KEY, 0, JHU_IOCTL_CRYPTO_KEY_CHAR_LEN);
+        memset(priv_data->current_crypto->IV, 0, JHU_IOCTL_CRYPTO_IV_CHAR_LEN);
 
         printk(KERN_INFO "[*]    Post Read State {isRead: %d, isWrite: %d, isKey: %d, isIV: %d, major: %d, minor: %d}\n",
                priv_data->is_open_for_read, priv_data->is_open_for_write,
                priv_data->is_key_initialized, priv_data->is_iv_initialized,
                priv_data->major, priv_data->minor);
 
-        // TODO Once this is read, we should erase it from the kernel right?
-
         break;
     case IOCTL_WRITE_TO_KERNEL_EVP:
-        printk(KERN_INFO "[*]    IOCTL_WRITE_TO_KERNEL_EVP\n");
+        printk(KERN_INFO "[*]    IOCTL_WRITE_TO_KERNEL\n");
         temp_evp = (struct jhu_ioctl_crypto *)ioctl_param;
 
-        if (priv_data->major == g_majornum_a) {
-            correct_evp = &evp_a;
-        } else if (priv_data->major == g_majornum_b) {
-            correct_evp = &evp_b;
-        } else {
-            return -EFAULT;
-        }
+        // Clear Data Remnants (Prevents Unstable Write/Read)
+        memset(priv_data->current_crypto->KEY, 0, JHU_IOCTL_CRYPTO_KEY_CHAR_LEN);
+        memset(priv_data->current_crypto->IV, 0, JHU_IOCTL_CRYPTO_IV_CHAR_LEN);
 
         // TODO Does this check if it's null terminated? or strnlen_user does a good job?
         if (strnlen_user(temp_evp->KEY, JHU_IOCTL_CRYPTO_KEY_CHAR_LEN) != JHU_IOCTL_CRYPTO_KEY_CHAR_LEN) {
@@ -568,24 +529,26 @@ long dev_ioctl(struct file *filep, unsigned int ioctl_num, unsigned long ioctl_p
             return -EAGAIN;
         }
 
-        memset(correct_evp->KEY, 0, sizeof(correct_evp->KEY));
-        error = copy_from_user(correct_evp->KEY, temp_evp->KEY, JHU_IOCTL_CRYPTO_KEY_CHAR_LEN);
+        error = copy_from_user(priv_data->current_crypto->KEY, temp_evp->KEY, JHU_IOCTL_CRYPTO_KEY_CHAR_LEN);
         if (error) {
-            memset(correct_evp->KEY, 0, sizeof(correct_evp->KEY)); // Clear memory after error
+            memset(priv_data->current_crypto->KEY, 0, JHU_IOCTL_CRYPTO_KEY_CHAR_LEN); // Clear memory after error
             return -EFAULT;
         }
         priv_data->is_key_initialized = true;
 
-        memset(correct_evp->IV, 0, sizeof(correct_evp->IV));
-        error = copy_from_user(correct_evp->IV, temp_evp->IV, JHU_IOCTL_CRYPTO_IV_CHAR_LEN);
+        error = copy_from_user(priv_data->current_crypto->IV, temp_evp->IV, JHU_IOCTL_CRYPTO_IV_CHAR_LEN);
         if (error) {
-            memset(correct_evp->KEY, 0, sizeof(correct_evp->KEY)); // Clear memory after error
+            priv_data->is_key_initialized = false;                                    // keeping it consistent
+            memset(priv_data->current_crypto->KEY, 0, JHU_IOCTL_CRYPTO_KEY_CHAR_LEN); // Clear memory after error
+            memset(priv_data->current_crypto->IV, 0, JHU_IOCTL_CRYPTO_IV_CHAR_LEN);   // Clear memory after error
             return -EFAULT;
         }
         priv_data->is_iv_initialized = true;
 
-        print_hex_dump(KERN_INFO, "[*]    KEY WRITE ", DUMP_PREFIX_NONE, 16, 1, correct_evp->KEY, JHU_IOCTL_CRYPTO_KEY_CHAR_LEN, true);
-        print_hex_dump(KERN_INFO, "[*]    IV WRITE ", DUMP_PREFIX_NONE, 16, 1, correct_evp->IV, JHU_IOCTL_CRYPTO_IV_CHAR_LEN, true);
+        printk(KERN_INFO "[*]    KEY WRITEN\n");
+        print_hex_dump(KERN_INFO, "[*]    ", DUMP_PREFIX_NONE, 16, 1, priv_data->current_crypto->KEY, JHU_IOCTL_CRYPTO_KEY_CHAR_LEN, true);
+        printk(KERN_INFO "[*]    IV WRITEN\n");
+        print_hex_dump(KERN_INFO, "[*]    ", DUMP_PREFIX_NONE, 16, 1, priv_data->current_crypto->IV, JHU_IOCTL_CRYPTO_IV_CHAR_LEN, true);
 
         printk(KERN_INFO "[*]    Post Write State {isRead: %d, isWrite: %d, isKey: %d, isIV: %d, major: %d, minor: %d}\n",
                priv_data->is_open_for_read, priv_data->is_open_for_write,
@@ -607,11 +570,12 @@ static int dev_release(struct inode *inodep, struct file *filep)
     //
     struct dev_private_data *priv_data = filep->private_data; // device should be opened at this stage...
 
+    // better safe than sorry
     if (!priv_data) {
         return 0;
     }
 
-    mutex_destroy(&priv_data->lock);
+    // Cleanup Private Device Data
     filep->private_data = NULL;
     kfree(priv_data);
 
