@@ -391,5 +391,12 @@ int main(int argc, char **argv)
 
     cryptTest();
 
+    //TODO
+    //1. Send IV/KEY information between devices (depending on device, one sends one recives)
+    //2. Setup User interaction to recive data and encrypt then transmit to device
+    //3. Recive data from device and decrypt
+
+
+
     return 0;
 }
