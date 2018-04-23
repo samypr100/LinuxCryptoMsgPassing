@@ -489,7 +489,7 @@ long dev_ioctl(struct file *filep, unsigned int ioctl_num, unsigned long ioctl_p
     printk(KERN_INFO "[*] Usermode is requesting %08x ioctl\n", ioctl_num);
 
     switch (ioctl_num) {
-    case IOCTL_READ_FROM_KERNEL_EVP:
+    case IOCTL_READ_FROM_KERNEL:
         printk(KERN_INFO "[*]    IOCTL_READ_FROM_KERNEL\n");
         temp_evp = (struct jhu_ioctl_crypto *)ioctl_param;
 
@@ -528,7 +528,7 @@ long dev_ioctl(struct file *filep, unsigned int ioctl_num, unsigned long ioctl_p
                priv_data->major, priv_data->minor);
 
         break;
-    case IOCTL_WRITE_TO_KERNEL_EVP:
+    case IOCTL_WRITE_TO_KERNEL:
         printk(KERN_INFO "[*]    IOCTL_WRITE_TO_KERNEL\n");
         temp_evp = (struct jhu_ioctl_crypto *)ioctl_param;
 

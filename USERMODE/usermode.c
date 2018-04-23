@@ -177,37 +177,6 @@ int cryptTest(void)
     return 0;
 }
 
-
-
-
-int ioctl_set_data(int fd, char *data)
-{
-    int i;
-    char c;
-
-    printf("[+] %s called\n", __FUNCTION__);
-
-    ioctl(fd, IOCTL_WRITE_TO_KERNEL, data);
-
-    printf("[+]    Data written: %s\n", data);
-
-    return 0;
-}
-
-int ioctl_read_data(int fd, char *data)
-{
-    int i;
-    char c;
-
-    printf("[+] %s called\n", __FUNCTION__);
-
-    ioctl(fd, IOCTL_READ_FROM_KERNEL, data);
-
-    printf("[+]    Data read: %s\n", data);
-
-    return 0;
-}
-
 int ioctl_set_data_evp(int fd, const unsigned char *key, const unsigned char *IV)
 {
 
@@ -216,13 +185,10 @@ int ioctl_set_data_evp(int fd, const unsigned char *key, const unsigned char *IV
     struct jhu_ioctl_crypto crypto_info;
     strncpy(crypto_info.KEY, key, JHU_IOCTL_CRYPTO_KEY_CHAR_LEN);
     strncpy(crypto_info.IV, IV, JHU_IOCTL_CRYPTO_IV_CHAR_LEN);
-    // make sure they're NULL terminated...
-    crypto_info.KEY[JHU_IOCTL_CRYPTO_KEY_CHAR_LEN - 1] = '\0';
-    crypto_info.IV[JHU_IOCTL_CRYPTO_IV_CHAR_LEN - 1] = '\0';
 
     printf("[+] key to write is %s, IV to write is %s, total struct size %lu\n", crypto_info.KEY, crypto_info.IV, sizeof(crypto_info));
 
-    ioctl(fd, IOCTL_WRITE_TO_KERNEL_EVP, &crypto_info);
+    ioctl(fd, IOCTL_WRITE_TO_KERNEL, &crypto_info);
 
     return 0;
 }
@@ -232,7 +198,7 @@ int ioctl_read_data_evp(int fd, struct jhu_ioctl_crypto *crypto_info)
 
     printf("[+] %s called\n", __FUNCTION__);
 
-    ioctl(fd, IOCTL_READ_FROM_KERNEL_EVP, crypto_info);
+    ioctl(fd, IOCTL_READ_FROM_KERNEL, crypto_info);
 
     printf("[+] key read is %s, IV read is %s, total struct size %lu\n", crypto_info->KEY, crypto_info->IV, sizeof(*crypto_info));
 
@@ -378,10 +344,11 @@ int main(int argc, char **argv)
     char msg_2[] = "ab";
     // write(fd_aw, msg_1024, sizeof(msg_1024));
     // write(fd_aw, msg_2, sizeof(msg_2));
-    write(fd_aw, msg_512_a, sizeof(msg_512_a));
-    write(fd_aw, msg_512_b, sizeof(msg_512_b));
+    write(fd_aw, msg_512_a, sizeof(msg_512_a) - 1);
+    write(fd_aw, msg_512_b, sizeof(msg_512_b) - 1);
     char read_msg[1025];
-    read(fd_br, read_msg, 1025);
+    read(fd_br, read_msg, 1024);
+    read_msg[1024] = '\0';
     printf("Read msg %s %zu\n", read_msg, strlen(read_msg));
 
     close(fd_aw);

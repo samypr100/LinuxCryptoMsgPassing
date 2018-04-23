@@ -75,12 +75,6 @@
 // write to kernel sequence number is base + 2
 #define JHU_IOCTL_WTK (JHU_IOCTL_BASE_SEQ + 2)
 
-// read from kernel sequence number is base evp + 3
-#define JHU_IOCTL_RFK_EVP (JHU_IOCTL_BASE_SEQ + 3)
-
-// write to kernel sequence number is base evp + 4
-#define JHU_IOCTL_WTK_EVP (JHU_IOCTL_BASE_SEQ + 4)
-
 //
 // _IOR() creates an IOCTL that is reading from the kernel
 //        JHU_IOCTL_MAGIC is the magic byte
@@ -92,9 +86,9 @@
  * For Sending Encryption Info using 256-bit CBS
  * https://wiki.openssl.org/index.php/EVP_Symmetric_Encryption_and_Decryption
  */
-#define JHU_IOCTL_CRYPTO_KEY_CHAR_LEN 32 + 1
+#define JHU_IOCTL_CRYPTO_KEY_CHAR_LEN 32
 
-#define JHU_IOCTL_CRYPTO_IV_CHAR_LEN 16 + 1
+#define JHU_IOCTL_CRYPTO_IV_CHAR_LEN 16
 
 #define JHU_IOCTL_CRYPTO
 struct jhu_ioctl_crypto
@@ -103,12 +97,8 @@ struct jhu_ioctl_crypto
     unsigned char IV[JHU_IOCTL_CRYPTO_IV_CHAR_LEN];   // 16 len unsigned char should be 128-bit IV (IV should be same as block size)
 } __attribute__((__packed__)); // adding packed just in case for the future if we add more things...
 
-#define IOCTL_READ_FROM_KERNEL _IOR(JHU_IOCTL_MAGIC, JHU_IOCTL_RFK, char *)
+#define IOCTL_READ_FROM_KERNEL _IOR(JHU_IOCTL_MAGIC, JHU_IOCTL_RFK, struct jhu_ioctl_crypto)
 
-#define IOCTL_WRITE_TO_KERNEL _IOWR(JHU_IOCTL_MAGIC, JHU_IOCTL_WTK, char *)
-
-#define IOCTL_READ_FROM_KERNEL_EVP _IOR(JHU_IOCTL_MAGIC, JHU_IOCTL_RFK_EVP, struct jhu_ioctl_crypto)
-
-#define IOCTL_WRITE_TO_KERNEL_EVP _IOWR(JHU_IOCTL_MAGIC, JHU_IOCTL_WTK_EVP, struct jhu_ioctl_crypto)
+#define IOCTL_WRITE_TO_KERNEL _IOWR(JHU_IOCTL_MAGIC, JHU_IOCTL_WTK, struct jhu_ioctl_crypto)
 
 #endif // JHU_OSS_CHAR_H
