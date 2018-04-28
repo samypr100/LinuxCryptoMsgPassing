@@ -266,6 +266,8 @@ struct jhu_crypto_client init_client_crypto(char client, char *devname_a, char *
     char *dev_to_write = (client == 'a') ? devname_b : devname_a;
 
     printf("Setting up encryption info for client %c \n", client);
+    crypto_client.read_fd = -1;
+    crypto_client.write_fd = -1;
     crypto_client.is_read_client_ready = false;
     crypto_client.is_write_client_ready = false;
     crypto_client.is_crypto_initialized = false;
@@ -378,6 +380,12 @@ int main(int argc, char **argv)
         struct jhu_crypto_client client_crypto = init_client_crypto('a', devname_a, devname_b);
         bool is_ready = client_crypto.is_crypto_initialized && client_crypto.is_read_client_ready && client_crypto.is_write_client_ready;
         if (!is_ready) {
+            if (client_crypto.read_fd == -1) {
+                close(client_crypto.read_fd);
+            }
+            if (client_crypto.write_fd == -1) {
+                close(client_crypto.read_fd);
+            }
             return -1;
         }
 
@@ -415,6 +423,12 @@ int main(int argc, char **argv)
         struct jhu_crypto_client client_crypto = init_client_crypto('b', devname_a, devname_b);
         bool is_ready = client_crypto.is_crypto_initialized && client_crypto.is_read_client_ready && client_crypto.is_write_client_ready;
         if (!is_ready) {
+            if (client_crypto.read_fd == -1) {
+                close(client_crypto.read_fd);
+            }
+            if (client_crypto.write_fd == -1) {
+                close(client_crypto.read_fd);
+            }
             return -1;
         }
 
