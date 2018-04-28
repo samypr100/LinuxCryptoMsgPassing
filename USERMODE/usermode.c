@@ -26,7 +26,6 @@
 #include <openssl/evp.h>
 #include <openssl/rand.h>
 
-
 // SMATOS2, EFORTE3 Modified from https://wiki.openssl.org/index.php/EVP_Symmetric_Encryption_and_Decryption#Encrypting_the_message
 void handleErrors(void)
 {
@@ -36,9 +35,8 @@ void handleErrors(void)
     abort();
 }
 
-
 int encrypt(unsigned char *plaintext, int plaintext_len, unsigned char *key,
-  unsigned char *iv, unsigned char *ciphertext)
+            unsigned char *iv, unsigned char *ciphertext)
 {
     EVP_CIPHER_CTX *ctx;
 
@@ -47,7 +45,7 @@ int encrypt(unsigned char *plaintext, int plaintext_len, unsigned char *key,
     int ciphertext_len;
 
     /* Create and initialise the context */
-    if(!(ctx = EVP_CIPHER_CTX_new())){
+    if (!(ctx = EVP_CIPHER_CTX_new())) {
         handleErrors();
     }
 
@@ -56,13 +54,13 @@ int encrypt(unsigned char *plaintext, int plaintext_len, unsigned char *key,
      * In this example we are using 256 bit AES (i.e. a 256 bit key). The
      * IV size for *most* modes is the same as the block size. For AES this
      * is 128 bits */
-    if(1 != EVP_EncryptInit_ex(ctx, EVP_aes_256_cbc(), NULL, key, iv)){
+    if (1 != EVP_EncryptInit_ex(ctx, EVP_aes_256_cbc(), NULL, key, iv)) {
         handleErrors();
     }
     /* Provide the message to be encrypted, and obtain the encrypted output.
      * EVP_EncryptUpdate can be called multiple times if necessary
      */
-    if(1 != EVP_EncryptUpdate(ctx, ciphertext, &len, plaintext, plaintext_len)){
+    if (1 != EVP_EncryptUpdate(ctx, ciphertext, &len, plaintext, plaintext_len)) {
         handleErrors();
     }
 
@@ -71,7 +69,7 @@ int encrypt(unsigned char *plaintext, int plaintext_len, unsigned char *key,
     /* Finalise the encryption. Further ciphertext bytes may be written at
      * this stage.
      */
-    if(1 != EVP_EncryptFinal_ex(ctx, ciphertext + len, &len)){
+    if (1 != EVP_EncryptFinal_ex(ctx, ciphertext + len, &len)) {
         handleErrors();
     }
 
@@ -84,7 +82,7 @@ int encrypt(unsigned char *plaintext, int plaintext_len, unsigned char *key,
 }
 
 int decrypt(unsigned char *ciphertext, int ciphertext_len, unsigned char *key,
-  unsigned char *iv, unsigned char *plaintext)
+            unsigned char *iv, unsigned char *plaintext)
 {
     EVP_CIPHER_CTX *ctx;
 
@@ -93,21 +91,22 @@ int decrypt(unsigned char *ciphertext, int ciphertext_len, unsigned char *key,
     int plaintext_len;
 
     /* Create and initialise the context */
-    if(!(ctx = EVP_CIPHER_CTX_new())) handleErrors();
+    if (!(ctx = EVP_CIPHER_CTX_new()))
+        handleErrors();
 
     /* Initialise the decryption operation. IMPORTANT - ensure you use a key
     * and IV size appropriate for your cipher
     * In this example we are using 256 bit AES (i.e. a 256 bit key). The
     * IV size for *most* modes is the same as the block size. For AES this
     * is 128 bits */
-    if(1 != EVP_DecryptInit_ex(ctx, EVP_aes_256_cbc(), NULL, key, iv)){
+    if (1 != EVP_DecryptInit_ex(ctx, EVP_aes_256_cbc(), NULL, key, iv)) {
         handleErrors();
     }
 
     /* Provide the message to be decrypted, and obtain the plaintext output.
     * EVP_DecryptUpdate can be called multiple times if necessary
     */
-    if(1 != EVP_DecryptUpdate(ctx, plaintext, &len, ciphertext, ciphertext_len)){
+    if (1 != EVP_DecryptUpdate(ctx, plaintext, &len, ciphertext, ciphertext_len)) {
         handleErrors();
     }
 
@@ -117,10 +116,10 @@ int decrypt(unsigned char *ciphertext, int ciphertext_len, unsigned char *key,
     * this stage.
     */
 
-    if(1 != EVP_DecryptFinal_ex(ctx, plaintext + len, &len)){
+    if (1 != EVP_DecryptFinal_ex(ctx, plaintext + len, &len)) {
         handleErrors();
     }
-    
+
     plaintext_len += len;
 
     /* Clean up */
@@ -169,7 +168,6 @@ char * D_decrypt(unsigned char *ciphertext,unsigned char *key,unsigned char *iv)
 }
 */
 
-
 // SMATOS2, EFORTE3 Crypt Test Function
 int cryptTest(void)
 {
@@ -182,7 +180,7 @@ int cryptTest(void)
     /* Message to be encrypted */
     unsigned char *plaintext = (unsigned char *)"Encrypt this for oss_695_412 project 2";
     printf("The pre-encrypted text: ");
-    printf("%s\n",plaintext);
+    printf("%s\n", plaintext);
 
     /* Buffer for ciphertext. Ensure the buffer is long enough for the
     * ciphertext which may be longer than the plaintext, dependant on the
@@ -195,9 +193,8 @@ int cryptTest(void)
 
     int decryptedtext_len, ciphertext_len;
 
-
     /* Encrypt the plaintext */
-    ciphertext_len = encrypt (plaintext, strlen ((char *)plaintext), key, iv, ciphertext);
+    ciphertext_len = encrypt(plaintext, strlen((char *)plaintext), key, iv, ciphertext);
 
     /* Do something useful with the ciphertext here */
     //printf("Ciphertext is:\n");
@@ -212,7 +209,6 @@ int cryptTest(void)
     /* Show the decrypted text */
     printf("Decrypted text is:\n");
     printf("%s\n", decryptedtext);
-
 
     return 0;
 }
@@ -299,8 +295,6 @@ int main(int argc, char **argv)
         printf("Unable to retrieve Random Bytes\n");
         return -1;
     }
-
-
 
     // Client A for Writing to Device B
 
@@ -404,32 +398,30 @@ int main(int argc, char **argv)
     /* A 128 bit IV */
     unsigned char *iv = (unsigned char *)"0123456789012345";
 
-
     //TODO
     //1. Initialize IV/KEY information between devices (depending on device, one sends one recives should be done in if statements)
 
     //User interaction structure
-    if(strchr(argv[1],'a') != NULL)
-    {
+    if (strchr(argv[1], 'a') != NULL) {
         //If user inputs a, we read from a and write to b
         //setup Encryption Info
         //For 60 seconds try to obtain key/IV
 
         printf("a is ready\n\n");
         printf("Please type your input below. The recieved data from \"b\" will show up as [a]:\n");
-        printf("Your input will show up as [me]:\n"); 
+        printf("Your input will show up as [me]:\n");
 
         //Run Driver interaction
 
         //TODO If there is things to be read from a (data from b), read them and print to the screen
         //if(thingsReadFromA)
         //{
-            //thingsReadFromA = read_a();
-            //printf("[a] %s, thingsReadFromA);
-            //decryptThingsFromA = decryptD(thingsReadFromA, IV_A);
-            //printf("[a] %s, decryptThingsFromA);
+        //thingsReadFromA = read_a();
+        //printf("[a] %s, thingsReadFromA);
+        //decryptThingsFromA = decryptD(thingsReadFromA, IV_A);
+        //printf("[a] %s, decryptThingsFromA);
         //}
-        
+
         //Take user input to send to b (write to b)
         char userInput[512];
         fgets(userInput, 512, stdin);
@@ -437,31 +429,27 @@ int main(int argc, char **argv)
         int ciphertext_len;
         unsigned char ciphertext[128];
 
-        ciphertext_len = encrypt (userInput, strlen ((char *)userInput), key, iv, ciphertext);
+        ciphertext_len = encrypt(userInput, strlen((char *)userInput), key, iv, ciphertext);
         //printf("Ciphertext is:\n");
         //BIO_dump_fp (stdout, (const char *)ciphertext, ciphertext_len);
 
         //TODO
         //writeToB(cipherText);
-
-
     }
-    if(strchr(argv[1],'b') != NULL)
-    {
+    if (strchr(argv[1], 'b') != NULL) {
         //If user inputs B then we read b write a
         printf("b is ready\n\n");
         printf("Please type your input below. The recieved data from \"a\" will show up as [a]:\n");
-        printf("Your input will show up as [me]:\n"); 
+        printf("Your input will show up as [me]:\n");
 
         //Run Driver interaction
 
         //TODO If there is things to be read from a (data from b), read them and print to the screen
-        if(1)
-        {
+        if (1) {
             //TODO Read b
             //thingsReadFromA = read_B();
 
-/*
+            /*
             int decryptedtext_len;
             unsigned char decryptedtext[512];
 
@@ -477,29 +465,26 @@ int main(int argc, char **argv)
             //printf("[b] %s, decryptThingsFromB);
 */
         }
-        
+
         //Take user input to send to a (write to a)
         char userInput[512];
         fgets(userInput, 512, stdin);
-       
+
         int ciphertext_len;
         unsigned char ciphertext[512];
 
-        ciphertext_len = encrypt(userInput, strlen ((char *)userInput), key, iv, ciphertext);
+        ciphertext_len = encrypt(userInput, strlen((char *)userInput), key, iv, ciphertext);
         //printf("Ciphertext is:\n");
         //BIO_dump_fp (stdout, (const char *)ciphertext, ciphertext_len);
 
-        //TODO 
+        //TODO
         //writeToA(ciphertext);
-
-
     }
 
-//    close(fd_aw);
-//    close(fd_bw);
-//    close(fd_ar);
-//    close(fd_br);
-
+    //    close(fd_aw);
+    //    close(fd_bw);
+    //    close(fd_ar);
+    //    close(fd_br);
 
     return 0;
 }
