@@ -380,10 +380,10 @@ int main(int argc, char **argv)
         struct jhu_crypto_client client_crypto = init_client_crypto('a', devname_a, devname_b);
         bool is_ready = client_crypto.is_crypto_initialized && client_crypto.is_read_client_ready && client_crypto.is_write_client_ready;
         if (!is_ready) {
-            if (client_crypto.read_fd == -1) {
+            if (client_crypto.read_fd != -1) {
                 close(client_crypto.read_fd);
             }
-            if (client_crypto.write_fd == -1) {
+            if (client_crypto.write_fd != -1) {
                 close(client_crypto.read_fd);
             }
             return -1;
@@ -423,10 +423,10 @@ int main(int argc, char **argv)
         struct jhu_crypto_client client_crypto = init_client_crypto('b', devname_a, devname_b);
         bool is_ready = client_crypto.is_crypto_initialized && client_crypto.is_read_client_ready && client_crypto.is_write_client_ready;
         if (!is_ready) {
-            if (client_crypto.read_fd == -1) {
+            if (client_crypto.read_fd != -1) {
                 close(client_crypto.read_fd);
             }
-            if (client_crypto.write_fd == -1) {
+            if (client_crypto.write_fd != -1) {
                 close(client_crypto.read_fd);
             }
             return -1;
