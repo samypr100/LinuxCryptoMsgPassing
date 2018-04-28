@@ -302,6 +302,7 @@ struct jhu_crypto_client init_client_crypto(char client, char *devname_a, char *
     fd_read = open(dev_to_read, O_RDONLY);
     if (fd_read < 0 || errno != 0) {
         printf("Can't open device file: %s for reading\n", dev_to_read);
+        close(fd_write);
         return crypto_client;
     }
     ioctl_read_rc = ioctl_read_data(fd_read, &crypto_client.write_crypto_info);
@@ -309,6 +310,7 @@ struct jhu_crypto_client init_client_crypto(char client, char *devname_a, char *
         printf("Waiting for %c... %d \n", opposite_client, sleep_limit);
         sleep_limit--;
         sleep(1);
+        errno = 0; // Once errno is not 0, it stays that way unless you acknowledge it for the ioctl
         ioctl_read_rc = ioctl_read_data(fd_read, &crypto_client.write_crypto_info);
     }
     if (ioctl_read_rc < 0 || errno != 0) {
