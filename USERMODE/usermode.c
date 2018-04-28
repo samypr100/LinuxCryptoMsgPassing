@@ -11,6 +11,7 @@
 *********************************************************************/
 #include "../COMMON/char_ioctl.h"
 
+#include <errno.h>
 #include <fcntl.h>
 #include <stdbool.h>
 #include <stdio.h>
@@ -28,8 +29,13 @@
 
 // SMATOS2, EFORTE3 Structure Per Client
 struct jhu_crypto_client {
-    bool is_initialized;
-    struct jhu_ioctl_crypto crypto_info;
+    int read_fd;
+    int write_fd;
+    bool is_read_client_ready;
+    bool is_write_client_ready;
+    bool is_crypto_initialized;
+    struct jhu_ioctl_crypto read_crypto_info;
+    struct jhu_ioctl_crypto write_crypto_info;
 } __attribute__((__packed__));
 
 // SMATOS2, EFORTE3 Modified from https://wiki.openssl.org/index.php/EVP_Symmetric_Encryption_and_Decryption#Encrypting_the_message
@@ -247,24 +253,73 @@ int ioctl_read_data(int fd, struct jhu_ioctl_crypto *crypto_info)
     return 0;
 }
 
-struct jhu_crypto_client init_client_crypto(char client)
+struct jhu_crypto_client init_client_crypto(char client, char *devname_a, char *devname_b)
 {
 
     int rc_key, rc_iv;
+    int fd_read, fd_write;
+    int sleep_limit = 60;
+    int ioctl_read_rc, ioctl_write_rc;
     struct jhu_crypto_client crypto_client;
+    char opposite_client = (client == 'a') ? 'b' : 'a';
+    char *dev_to_read = (client == 'a') ? devname_a : devname_b;
+    char *dev_to_write = (client == 'a') ? devname_b : devname_a;
 
-    printf("Setting up encryption info for client %c.\n", client);
+    printf("Setting up encryption info for client %c \n", client);
+    crypto_client.is_read_client_ready = false;
+    crypto_client.is_write_client_ready = false;
+    crypto_client.is_crypto_initialized = false;
 
-    rc_key = RAND_bytes(crypto_client.crypto_info.KEY, JHU_IOCTL_CRYPTO_KEY_CHAR_LEN);
-    rc_iv = RAND_bytes(crypto_client.crypto_info.IV, JHU_IOCTL_CRYPTO_IV_CHAR_LEN);
+    // Setup my Crypto Info for Reading
+    rc_key = RAND_bytes(crypto_client.read_crypto_info.KEY, JHU_IOCTL_CRYPTO_KEY_CHAR_LEN);
+    rc_iv = RAND_bytes(crypto_client.read_crypto_info.IV, JHU_IOCTL_CRYPTO_IV_CHAR_LEN);
     if (!rc_iv || !rc_key) {
-        printf("Unable to retrieve Random Bytes for %c\n", client);
-        crypto_client.is_initialized = false;
+        printf("Unable to retrieve Random Bytes for %c \n", client);
+        return crypto_client;
+    }
+    crypto_client.is_crypto_initialized = true;
+
+    // Opposing Client, Send My Crypto Info for Reading
+    printf("Sending encryption info to client %c on device %s \n", opposite_client, dev_to_write);
+    fd_write = open(dev_to_write, O_WRONLY);
+    if (fd_write < 0 || errno != 0) {
+        printf("Can't open device file: %s for writing \n", dev_to_write);
+        return crypto_client;
+    }
+    ioctl_write_rc = ioctl_set_data(fd_write, crypto_client.read_crypto_info.KEY, crypto_client.read_crypto_info.IV);
+    if (ioctl_write_rc < 0 || errno != 0) {
+        printf("Can't initialize KEY/IV for writing on %s \n", dev_to_write);
+        close(fd_write);
+        return crypto_client;
+    }
+    crypto_client.write_fd = fd_write;
+    crypto_client.is_write_client_ready = true;
+
+    // Current Client (Self), Get Crypto Info for Writing
+    printf("Preparing to wait for %c on device %s \n", opposite_client, dev_to_read);
+    fd_read = open(dev_to_read, O_RDONLY);
+    if (fd_read < 0 || errno != 0) {
+        printf("Can't open device file: %s for reading\n", dev_to_read);
+        return crypto_client;
+    }
+    ioctl_read_rc = ioctl_read_data(fd_read, &crypto_client.write_crypto_info);
+    while (sleep_limit > 0 && errno == EAGAIN) {
+        printf("Waiting for %c... %d \n", opposite_client, sleep_limit);
+        sleep_limit--;
+        sleep(1);
+        ioctl_read_rc = ioctl_read_data(fd_read, &crypto_client.write_crypto_info);
+    }
+    if (ioctl_read_rc < 0 || errno != 0) {
+        printf("Can't retrieve KEY/IV for writing on %s \n", dev_to_write);
+        close(fd_write);
+        close(fd_read);
         return crypto_client;
     }
 
     printf("%c is ready.\n", client);
-    crypto_client.is_initialized = true;
+
+    crypto_client.read_fd = fd_read;
+    crypto_client.is_read_client_ready = true;
 
     return crypto_client;
 }
@@ -320,8 +375,9 @@ int main(int argc, char **argv)
         //If user inputs a, we read from a and write to b
         //setup Encryption Info
         //For 60 seconds try to obtain key/IV
-        struct jhu_crypto_client client_crypto = init_client_crypto('a');
-        if (client_crypto.is_initialized != true) {
+        struct jhu_crypto_client client_crypto = init_client_crypto('a', devname_a, devname_b);
+        bool is_ready = client_crypto.is_crypto_initialized && client_crypto.is_read_client_ready && client_crypto.is_write_client_ready;
+        if (!is_ready) {
             return -1;
         }
 
@@ -356,8 +412,9 @@ int main(int argc, char **argv)
 
     if (strchr(argv[1], 'b') != NULL) {
         //If user inputs B then we read b write a
-        struct jhu_crypto_client client_crypto = init_client_crypto('b');
-        if (client_crypto.is_initialized != true) {
+        struct jhu_crypto_client client_crypto = init_client_crypto('b', devname_a, devname_b);
+        bool is_ready = client_crypto.is_crypto_initialized && client_crypto.is_read_client_ready && client_crypto.is_write_client_ready;
+        if (!is_ready) {
             return -1;
         }
 
@@ -522,20 +579,19 @@ int main(int argc, char **argv)
         read_msg[1024] = '\0';
         printf("Read msg %s %zu\n", read_msg, strlen(read_msg));
 
-            int decryptedtext_len;
-            unsigned char decryptedtext[1025];
+        int decryptedtext_len;
+        unsigned char decryptedtext[1025];
 
-            // Decrypt the ciphertext 
-            decryptedtext_len = decrypt(read_msg, strlen ((char *)read_msg), key, iv, decryptedtext);
+        // Decrypt the ciphertext
+        decryptedtext_len = decrypt(read_msg, strlen((char *)read_msg), key, iv, decryptedtext);
 
-            // Add a NULL terminator. We are expecting printable text 
-            decryptedtext[decryptedtext_len] = '\0';
+        // Add a NULL terminator. We are expecting printable text
+        decryptedtext[decryptedtext_len] = '\0';
 
-            // Show the decrypted text 
-            printf("Decrypted text is:\n");
-            printf("%s\n", decryptedtext);
-            //printf("[b] %s, decryptThingsFromB);
-
+        // Show the decrypted text
+        printf("Decrypted text is:\n");
+        printf("%s\n", decryptedtext);
+        //printf("[b] %s, decryptThingsFromB);
 
         close(fd_aw);
         close(fd_bw);
