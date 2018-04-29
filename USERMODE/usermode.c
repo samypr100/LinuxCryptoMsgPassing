@@ -13,12 +13,12 @@
 
 #include <errno.h>
 #include <fcntl.h>
+#include <signal.h>
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
-#include <signal.h>
 //
 // This header is required for the ioctl() call
 #include <sys/ioctl.h>
@@ -43,11 +43,11 @@ struct jhu_crypto_client {
 //https://stackoverflow.com/questions/4217037/catch-ctrl-c-in-c
 //void sigint_handler(int);
 
-void sigint_handler(int sig){
+void sigint_handler(int sig)
+{
     printf("\nQuiting process %d\n", getpid());
     exit(0);
 }
-
 
 // SMATOS2, EFORTE3 Taken/Mofified from https://wiki.openssl.org/index.php/EVP_Symmetric_Encryption_and_Decryption#Encrypting_the_message
 int encrypt(unsigned char *plaintext, int plaintext_len, unsigned char *key, unsigned char *iv, unsigned char *ciphertext)
@@ -272,10 +272,8 @@ int main(int argc, char **argv)
     char devname_a[32];
     char devname_b[32];
 
-    
     signal(SIGINT, sigint_handler);
     //signal(SIGKILL, sigint_handler);
-
 
     if (argc < 2 || argv[1] == NULL) {
         printf("Usage: ./myuser [a or b or t (test)] \n");
@@ -306,8 +304,6 @@ int main(int argc, char **argv)
         return -1;
     }
 
- 
-
     //User interaction structure
     if (strchr(argv[1], 'a') != NULL) {
 
@@ -331,7 +327,6 @@ int main(int argc, char **argv)
 
         //Run Driver interaction
 
-       
         //Init variables
         int num_read;
         char read_msg[1024];
@@ -363,11 +358,10 @@ int main(int argc, char **argv)
                 exit(1);
             }
 
-
             //Reading Things
             printf("blocking, waiting for data to read\n");
             //printf("Read msg %s %zu\n", read_msg, strlen(read_msg));
-            while(1){
+            while (1) {
                 num_read = read(client_crypto.read_fd, read_msg, 1024);
                 if (errno != 0) {
                     printf("Killing myself, got an error %d from kernel, please restart the other client as well manually\n", errno);
@@ -380,11 +374,10 @@ int main(int argc, char **argv)
                 if (num_read < 1) {
                     //printf("NO DATA READ\n");
                     sleep(0.5);
+                } else {
+                    break;
                 }
-                else{
-                    break; 
-                }
-             }
+            }
 
             if (num_read > 0) {
                 //printf("Read data:\n");
@@ -402,10 +395,6 @@ int main(int argc, char **argv)
                 printf("[b]:%s\n", decryptedtext);
                 //printf("[b] %s", decryptThingsFromB);
             }
-
-
-
-
         }
 
         close(client_crypto.write_fd);
@@ -440,7 +429,7 @@ int main(int argc, char **argv)
 
         //Run Driver interaction
         while (1) {
- 
+
             printf("blocking, waiting for user input\n");
             //Write Things
             //Take user input to send to b (write to b)
@@ -460,12 +449,11 @@ int main(int argc, char **argv)
                 exit(1);
             }
 
-
             //Reading Things
 
             //printf("Read msg %s %zu\n", read_msg, strlen(read_msg));
             printf("blocking, waiting for data to read\n");
-            while(1){
+            while (1) {
                 num_read = read(client_crypto.read_fd, read_msg, 1024);
                 if (errno != 0) {
                     printf("Killing myself, got an error %d from kernel, please restart the other client as well manually\n", errno);
@@ -478,11 +466,10 @@ int main(int argc, char **argv)
                 if (num_read < 1) {
                     //printf("NO DATA READ\n");
                     sleep(0.5);
+                } else {
+                    break;
                 }
-                else{
-                    break; 
-                }
-             }
+            }
 
             if (num_read > 0) {
                 //printf("Read data:\n");
@@ -500,10 +487,6 @@ int main(int argc, char **argv)
                 printf("[a]:%s\n", decryptedtext);
                 //printf("[b] %s", decryptThingsFromB);
             }
-
-
-
-
         }
         close(client_crypto.write_fd);
         close(client_crypto.read_fd);
