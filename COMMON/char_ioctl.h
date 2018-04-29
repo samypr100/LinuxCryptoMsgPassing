@@ -19,6 +19,7 @@
 #include <linux/ioctl.h>
 
 // SMATOS2,EFORTE3 Declaring the two devices
+// Using "secret412a" and "secret412b" as the Project Instructions state.
 #define DEVICE_NAME_A "secret412a"
 #define DEVICE_NAME_B "secret412b"
 
@@ -83,24 +84,33 @@
 //
 
 /*
- * For Sending Encryption Info using 256-bit CBS
+ * SMATOS2, EFORTE3: For Sending Encryption Info using 256-bit CBS
  * https://wiki.openssl.org/index.php/EVP_Symmetric_Encryption_and_Decryption
  */
 #define JHU_IOCTL_CRYPTO_KEY_CHAR_LEN 32
 
+/*
+ * SMATOS2, EFORTE3: For Sending Encryption Info using 256-bit CBS
+ * https://wiki.openssl.org/index.php/EVP_Symmetric_Encryption_and_Decryption
+ */
 #define JHU_IOCTL_CRYPTO_IV_CHAR_LEN 16
 
+/*
+ * SMATOS2, EFORTE3: Exposing the message limit to usermode for ease of development.
+ */
 #define JHU_IOCTL_MESSAGE_LIMIT 1024
 
+// SMATOS2, EFORTE3: Structure that Userspace/Kernel IOCTL will use to communicate KEY/IV information.
 #define JHU_IOCTL_CRYPTO
-struct jhu_ioctl_crypto
-{
+struct jhu_ioctl_crypto {
     unsigned char KEY[JHU_IOCTL_CRYPTO_KEY_CHAR_LEN]; // 32 len unsigned char should be 256-bit
     unsigned char IV[JHU_IOCTL_CRYPTO_IV_CHAR_LEN];   // 16 len unsigned char should be 128-bit IV (IV should be same as block size)
-} __attribute__((__packed__)); // adding packed just in case for the future if we add more things...
+} __attribute__((__packed__));                        // adding packed just in case for the future if we add more things...
 
+// SMATOS2, EFORTE3: changed "char *" to "struct jhu_ioctl_crypto" for appropriate sizing of the IOCTL argument.
 #define IOCTL_READ_FROM_KERNEL _IOR(JHU_IOCTL_MAGIC, JHU_IOCTL_RFK, struct jhu_ioctl_crypto)
 
+// SMATOS2, EFORTE3: changed "char *" to "struct jhu_ioctl_crypto" for appropriate sizing of the IOCTL argument.
 #define IOCTL_WRITE_TO_KERNEL _IOWR(JHU_IOCTL_MAGIC, JHU_IOCTL_WTK, struct jhu_ioctl_crypto)
 
 #endif // JHU_OSS_CHAR_H
