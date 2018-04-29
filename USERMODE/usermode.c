@@ -376,7 +376,7 @@ int main(int argc, char **argv)
 
     //User interaction structure
     if (strchr(argv[1], 'a') != NULL) {
-        
+
         //If user inputs a, we read from a and write to b
         //setup Encryption Info
         //For 60 seconds try to obtain key/IV
@@ -392,11 +392,9 @@ int main(int argc, char **argv)
             return -1;
         }
 
-
-
         printf("Please type your input below. The recieved data from \"b\" will show up as [a]:\n");
         printf("Your input will show up as [me]:\n");
-        
+
         //Run Driver interaction
 
         //TODO If there is things to be read from a (data from b), read them and print to the screen
@@ -407,7 +405,7 @@ int main(int argc, char **argv)
         //decryptThingsFromA = decryptD(thingsReadFromA, IV_A);
         //printf("[a] %s, decryptThingsFromA);
         //}
-        
+
         int num_read;
         char read_msg[1024];
         int decryptedtext_len;
@@ -416,49 +414,53 @@ int main(int argc, char **argv)
         int ciphertext_len;
         unsigned char ciphertext[1024];
 
-        while(1){
-        num_read = read(client_crypto.read_fd, read_msg, 1024);
-        read_msg[1024] = '\0';
-        //printf("Read msg %s %zu\n", read_msg, strlen(read_msg));
+        while (1) {
+            num_read = read(client_crypto.read_fd, read_msg, 1024);
+            if (errno != 0) {
+                printf("Killing myself, got an error %d from kernel, please restart the other client as well manually\n", errno);
+                exit(1);
+            }
+            read_msg[1024] = '\0';
+            //printf("Read msg %s %zu\n", read_msg, strlen(read_msg));
 
-        if(num_read < 1){
-            printf("NO DATA READ\n");
-        }
+            if (num_read < 1) {
+                printf("NO DATA READ\n");
+            }
 
-        //TODO If there is things to be read from a (data from b), read them and print to the screen
-        if (num_read > 0) {
-             printf("Read data:\n");
-             BIO_dump_fp (stdout, (const char *)read_msg, num_read);            
+            //TODO If there is things to be read from a (data from b), read them and print to the screen
+            if (num_read > 0) {
+                printf("Read data:\n");
+                BIO_dump_fp(stdout, (const char *)read_msg, num_read);
 
+                // Decrypt the ciphertext
+                decryptedtext_len = decrypt(read_msg, num_read, client_crypto.read_crypto_info.KEY, client_crypto.read_crypto_info.IV, decryptedtext);
 
-            // Decrypt the ciphertext 
-            decryptedtext_len = decrypt(read_msg, num_read, client_crypto.read_crypto_info.KEY, client_crypto.read_crypto_info.IV, decryptedtext);
+                // Add a NULL terminator. We are expecting printable text
+                decryptedtext[decryptedtext_len] = '\0';
 
-            // Add a NULL terminator. We are expecting printable text 
-            decryptedtext[decryptedtext_len] = '\0';
+                // Show the decrypted text
+                printf("Decrypted text is:\n");
+                printf("%s\n", decryptedtext);
+                //printf("[b] %s", decryptThingsFromB);
+            }
 
-            // Show the decrypted text 
-            printf("Decrypted text is:\n");
-            printf("%s\n", decryptedtext);
-            //printf("[b] %s", decryptThingsFromB);
+            //Take user input to send to b (write to b)
+            fgets(userInput, 1024, stdin);
 
-        }
+            ciphertext_len = encrypt(userInput, strlen((char *)userInput), client_crypto.write_crypto_info.KEY, client_crypto.write_crypto_info.IV, ciphertext);
+            printf("Ciphertext is:\n");
+            BIO_dump_fp(stdout, (const char *)ciphertext, ciphertext_len);
 
-
-        //Take user input to send to b (write to b)
-        fgets(userInput, 1024, stdin);
-
-        ciphertext_len = encrypt(userInput, strlen((char *)userInput), client_crypto.write_crypto_info.KEY, client_crypto.write_crypto_info.IV, ciphertext);
-        printf("Ciphertext is:\n");
-        BIO_dump_fp (stdout, (const char *)ciphertext, ciphertext_len);
-
-        //TODO
-        //writeToA(ciphertext);
-        write(client_crypto.write_fd, ciphertext, ciphertext_len);
+            //TODO
+            //writeToA(ciphertext);
+            write(client_crypto.write_fd, ciphertext, ciphertext_len);
+            if (errno != 0) {
+                printf("Killing myself, got an error %d from kernel, please restart the other client as well manually\n", errno);
+                exit(1);
+            }
         }
         close(client_crypto.write_fd);
         close(client_crypto.read_fd);
-
     }
 
     if (strchr(argv[1], 'b') != NULL) {
@@ -487,53 +489,56 @@ int main(int argc, char **argv)
         char userInput[1024];
 
         //Run Driver interaction
-        while(1){
-        //TODO Read b
-        //thingsReadFromB = read_B();
+        while (1) {
+            //TODO Read b
+            //thingsReadFromB = read_B();
 
-        num_read = read(client_crypto.read_fd, read_msg, 1024);
-        read_msg[1024] = '\0';
-        //printf("Read msg %s %zu\n", read_msg, strlen(read_msg));
+            num_read = read(client_crypto.read_fd, read_msg, 1024);
+            if (errno != 0) {
+                printf("Killing myself, got an error %d from kernel, please restart the other client as well manually\n", errno);
+                exit(1);
+            }
+            read_msg[1024] = '\0';
+            //printf("Read msg %s %zu\n", read_msg, strlen(read_msg));
 
-        if(num_read < 1){
-            printf("NO DATA READ\n");
-        }
+            if (num_read < 1) {
+                printf("NO DATA READ\n");
+            }
 
-        //TODO If there is things to be read from a (data from b), read them and print to the screen
-        if (num_read > 0) {
-             printf("Read data:\n");
-             BIO_dump_fp (stdout, (const char *)read_msg, num_read);
+            //TODO If there is things to be read from a (data from b), read them and print to the screen
+            if (num_read > 0) {
+                printf("Read data:\n");
+                BIO_dump_fp(stdout, (const char *)read_msg, num_read);
 
+                // Decrypt the ciphertext
+                decryptedtext_len = decrypt(read_msg, num_read, client_crypto.read_crypto_info.KEY, client_crypto.read_crypto_info.IV, decryptedtext);
 
-            // Decrypt the ciphertext 
-            decryptedtext_len = decrypt(read_msg, num_read, client_crypto.read_crypto_info.KEY, client_crypto.read_crypto_info.IV, decryptedtext);
+                // Add a NULL terminator. We are expecting printable text
+                decryptedtext[decryptedtext_len] = '\0';
 
-            // Add a NULL terminator. We are expecting printable text 
-            decryptedtext[decryptedtext_len] = '\0';
+                // Show the decrypted text
+                //printf("Decrypted text is:\n");
+                //printf("%s\n", decryptedtext);
+                //printf("[b] %s", decryptThingsFromB);
+                printf("Decrypted is:\n");
+                BIO_dump_fp(stdout, (const char *)decryptedtext, decryptedtext_len);
+            }
 
-            // Show the decrypted text 
-            //printf("Decrypted text is:\n");
-            //printf("%s\n", decryptedtext);
-            //printf("[b] %s", decryptThingsFromB);
-            printf("Decrypted is:\n");
-            BIO_dump_fp (stdout, (const char *)decryptedtext, decryptedtext_len);
+            //Take user input to send to a (write to a)
 
+            fgets(userInput, 1024, stdin);
 
-        }
+            ciphertext_len = encrypt(userInput, strlen((char *)userInput), client_crypto.write_crypto_info.KEY, client_crypto.write_crypto_info.IV, ciphertext);
+            printf("Ciphertext is:\n");
+            BIO_dump_fp(stdout, (const char *)ciphertext, ciphertext_len);
 
-        //Take user input to send to a (write to a)
-
-        fgets(userInput, 1024, stdin);
-
-
-
-        ciphertext_len = encrypt(userInput, strlen((char *)userInput), client_crypto.write_crypto_info.KEY, client_crypto.write_crypto_info.IV, ciphertext);
-        printf("Ciphertext is:\n");
-        BIO_dump_fp (stdout, (const char *)ciphertext, ciphertext_len);
-
-        //TODO
-        //writeToA(ciphertext);
-        write(client_crypto.write_fd, ciphertext, ciphertext_len);
+            //TODO
+            //writeToA(ciphertext);
+            write(client_crypto.write_fd, ciphertext, ciphertext_len);
+            if (errno != 0) {
+                printf("Killing myself, got an error %d from kernel, please restart the other client as well manually\n", errno);
+                exit(1);
+            }
         }
         close(client_crypto.write_fd);
         close(client_crypto.read_fd);
@@ -676,7 +681,6 @@ int main(int argc, char **argv)
         close(fd_ar);
         close(fd_br);
     }
-
 
     return 0;
 }
