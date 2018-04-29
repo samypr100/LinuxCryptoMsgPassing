@@ -243,7 +243,10 @@ int ioctl_set_data(int fd, const unsigned char *key, const unsigned char *IV)
     strncpy(crypto_info.KEY, key, JHU_IOCTL_CRYPTO_KEY_CHAR_LEN);
     strncpy(crypto_info.IV, IV, JHU_IOCTL_CRYPTO_IV_CHAR_LEN);
 
-    printf("[+] key to write is %s, IV to write is %s, total struct size %lu\n", crypto_info.KEY, crypto_info.IV, sizeof(crypto_info));
+    printf("[+] Key Written is:\n");
+    BIO_dump_fp(stdout, crypto_info.KEY, JHU_IOCTL_CRYPTO_KEY_CHAR_LEN);
+    printf("[+] IV Written is:\n");
+    BIO_dump_fp(stdout, crypto_info.IV, JHU_IOCTL_CRYPTO_IV_CHAR_LEN);
 
     ioctl(fd, IOCTL_WRITE_TO_KERNEL, &crypto_info);
 
@@ -257,7 +260,10 @@ int ioctl_read_data(int fd, struct jhu_ioctl_crypto *crypto_info)
 
     ioctl(fd, IOCTL_READ_FROM_KERNEL, crypto_info);
 
-    printf("[+] key read is %s, IV read is %s, total struct size %lu\n", crypto_info->KEY, crypto_info->IV, sizeof(*crypto_info));
+    printf("[+] Key Read is:\n");
+    BIO_dump_fp(stdout, crypto_info->KEY, JHU_IOCTL_CRYPTO_KEY_CHAR_LEN);
+    printf("[+] IV Read is:\n");
+    BIO_dump_fp(stdout, crypto_info->IV, JHU_IOCTL_CRYPTO_IV_CHAR_LEN);
 
     return 0;
 }
