@@ -316,7 +316,7 @@ static int dev_open(struct inode *inodep, struct file *filep)
 // That is, the user mode program is expected to read data from
 // this device
 //
-static ssize_t dev_read(struct file *filep, char *buffer, size_t len, loff_t *offset)
+static ssize_t dev_read(struct file *filep, char __user *buffer, size_t len, loff_t *offset)
 {
 
     char *kbuf;
@@ -397,7 +397,7 @@ static ssize_t dev_read(struct file *filep, char *buffer, size_t len, loff_t *of
 // This path is called when write() is made on the file descriptor
 // That is, the user mode program is passing data to this function
 //
-static ssize_t dev_write(struct file *filep, const char *buffer, size_t len, loff_t *offset)
+static ssize_t dev_write(struct file *filep, const char __user *buffer, size_t len, loff_t *offset)
 {
 
     // https://github.com/torvalds/linux/blob/v4.15/kernel/printk/printk.c#L756
@@ -478,7 +478,7 @@ static ssize_t dev_write(struct file *filep, const char *buffer, size_t len, lof
 long dev_ioctl(struct file *filep, unsigned int ioctl_num, unsigned long ioctl_param)
 {
     int error = 0;
-    struct jhu_ioctl_crypto __user *temp_evp = NULL;
+    struct jhu_ioctl_crypto *temp_evp = NULL;
     struct dev_private_data *priv_data = filep->private_data; // device should be opened at this stage...
 
     // better safe than sorry
