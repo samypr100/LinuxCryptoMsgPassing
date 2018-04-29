@@ -159,6 +159,12 @@ int main(int argc, char **argv)
 
                 // SMATOS2, EFORTE3: Decrypt the ciphertext
                 decryptedtext_len = decrypt(read_msg, num_read, client_crypto.read_crypto_info.KEY, client_crypto.read_crypto_info.IV, decryptedtext);
+                if (decryptedtext_len < 0) {
+                    printf("An error was encountered, please restart both clients.\n");
+                    close(client_crypto.write_fd);
+                    close(client_crypto.read_fd);
+                    exit(1);
+                }
 
                 // SMATOS2, EFORTE3: Add a NULL terminator since we are expecting printable text
                 decryptedtext[decryptedtext_len] = '\0';
@@ -249,6 +255,12 @@ int main(int argc, char **argv)
 
                 // SMATOS2, EFORTE3: Decrypt the ciphertext
                 decryptedtext_len = decrypt(read_msg, num_read, client_crypto.read_crypto_info.KEY, client_crypto.read_crypto_info.IV, decryptedtext);
+                if (decryptedtext_len < 0) {
+                    printf("An error was encountered, please restart both clients.\n");
+                    close(client_crypto.write_fd);
+                    close(client_crypto.read_fd);
+                    exit(1);
+                }
 
                 // SMATOS2, EFORTE3: Add a NULL terminator since we are expecting printable text
                 decryptedtext[decryptedtext_len] = '\0';
