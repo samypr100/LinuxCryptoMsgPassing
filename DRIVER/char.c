@@ -571,6 +571,8 @@ long dev_ioctl(struct file *filep, unsigned int ioctl_num, unsigned long ioctl_p
         break;
     }
 
+    printk(KERN_INFO "[*] Usermode %08x ioctl request finished\n", ioctl_num);
+
     return 0;
 }
 
@@ -579,18 +581,37 @@ static int dev_release(struct inode *inodep, struct file *filep)
     //
     // This path is called when the file descriptor is closed
     //
+    bool is_write, is_read;
+    int device_id = imajor(inodep);
     struct dev_private_data *priv_data = filep->private_data; // device should be opened at this stage...
+    char *device_name = (device_id == g_majornum_a) ? "Device A" : (device_id == g_majornum_b) ? "Device B" : "UNKNOWN";
+    char *device_role;
 
     // better safe than sorry
     if (!priv_data) {
         return 0;
     }
 
+    is_write = priv_data->is_open_for_write;
+    is_read = priv_data->is_open_for_read;
+    device_role = is_write ? "Write" : is_read ? "Read" : "N/A";
+    // TODO Should I delete here or in the IOCTL READ?
+    // Writer Closed, Cleanup KEY/IV received and any message sent.
+    // There should be nothing to read anymore for the reader...
+    // if (priv_data->is_open_for_write) {
+    //     printk("[*] Deleting data for %s\n", device_name);
+    //     (*priv_data->current_offset) = 0;
+    //     (*priv_data->current_crypto_initialized) = false;
+    //     memset(priv_data->current_msg, 0, MAX_ALLOWED_MESSAGE);
+    //     memset(priv_data->current_crypto->KEY, 0, JHU_IOCTL_CRYPTO_KEY_CHAR_LEN); // Clear memory KEY
+    //     memset(priv_data->current_crypto->IV, 0, JHU_IOCTL_CRYPTO_IV_CHAR_LEN);   // Clear memory IV
+    // }
+
     // Cleanup Private Device Data
     filep->private_data = NULL;
     kfree(priv_data);
 
-    printk(KERN_INFO "[*] Releasing the file\n");
+    printk(KERN_INFO "[*] Releasing the file %s opened for %s \n", device_name, device_role);
 
     return 0;
 }
