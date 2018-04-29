@@ -24,9 +24,9 @@
 
 // SMATOS2, EFORTE3 LibSSL
 #include <openssl/aes.h>
+#include <openssl/err.h>
 #include <openssl/evp.h>
 #include <openssl/rand.h>
-#include <openssl/err.h>
 
 // SMATOS2, EFORTE3 Structure Per Client
 struct jhu_crypto_client {
@@ -42,7 +42,7 @@ struct jhu_crypto_client {
 // SMATOS2, EFORTE3 Modified from https://wiki.openssl.org/index.php/EVP_Symmetric_Encryption_and_Decryption#Encrypting_the_message
 void handleErrors(void)
 {
-    printf("An error occured with the encryption, and my error handling is bad\n");
+    // printf("An error occured with the encryption, and my error handling is bad\n");
     ERR_print_errors_fp(stderr);
     //printf(stderr);
     abort();
@@ -59,7 +59,7 @@ int encrypt(unsigned char *plaintext, int plaintext_len, unsigned char *key,
 
     /* Create and initialise the context */
     if (!(ctx = EVP_CIPHER_CTX_new())) {
-        printf("Error on Initlaizing the encryption Context\n");
+        // printf("Error on Initlaizing the encryption Context\n");
         handleErrors();
     }
 
@@ -69,14 +69,14 @@ int encrypt(unsigned char *plaintext, int plaintext_len, unsigned char *key,
      * IV size for *most* modes is the same as the block size. For AES this
      * is 128 bits */
     if (1 != EVP_EncryptInit_ex(ctx, EVP_aes_256_cbc(), NULL, key, iv)) {
-        printf("Error on Initializing encryption operation\n");
+        // printf("Error on Initializing encryption operation\n");
         handleErrors();
     }
     /* Provide the message to be encrypted, and obtain the encrypted output.
      * EVP_EncryptUpdate can be called multiple times if necessary
      */
     if (1 != EVP_EncryptUpdate(ctx, ciphertext, &len, plaintext, plaintext_len)) {
-        printf("Error on add adding message to be encrypted\n");
+        // printf("Error on add adding message to be encrypted\n");
         handleErrors();
     }
 
@@ -86,7 +86,7 @@ int encrypt(unsigned char *plaintext, int plaintext_len, unsigned char *key,
      * this stage.
      */
     if (1 != EVP_EncryptFinal_ex(ctx, ciphertext + len, &len)) {
-        printf("Error on add final encryption bytes\n");
+        // printf("Error on add final encryption bytes\n");
         handleErrors();
     }
 
@@ -109,7 +109,7 @@ int decrypt(unsigned char *ciphertext, int ciphertext_len, unsigned char *key,
 
     /* Create and initialise the context */
     if (!(ctx = EVP_CIPHER_CTX_new()))
-        printf("Error on Initlaizing the decrypiton Context\n");
+        // printf("Error on Initlaizing the decrypiton Context\n");
         handleErrors();
 
     /* Initialise the decryption operation. IMPORTANT - ensure you use a key
@@ -118,7 +118,7 @@ int decrypt(unsigned char *ciphertext, int ciphertext_len, unsigned char *key,
     * IV size for *most* modes is the same as the block size. For AES this
     * is 128 bits */
     if (1 != EVP_DecryptInit_ex(ctx, EVP_aes_256_cbc(), NULL, key, iv)) {
-        printf("Error on Initlaizing the decrypiton operation\n");
+        // printf("Error on Initlaizing the decrypiton operation\n");
         handleErrors();
     }
 
@@ -126,7 +126,7 @@ int decrypt(unsigned char *ciphertext, int ciphertext_len, unsigned char *key,
     * EVP_DecryptUpdate can be called multiple times if necessary
     */
     if (1 != EVP_DecryptUpdate(ctx, plaintext, &len, ciphertext, ciphertext_len)) {
-        printf("Error on adding message to be decrypted\n");
+        // printf("Error on adding message to be decrypted\n");
         handleErrors();
     }
 
@@ -137,7 +137,7 @@ int decrypt(unsigned char *ciphertext, int ciphertext_len, unsigned char *key,
     */
 
     if (1 != EVP_DecryptFinal_ex(ctx, plaintext + len, &len)) {
-        printf("Error on adding final decrytped bytes\n");
+        // printf("Error on adding final decrytped bytes\n");
         handleErrors();
     }
 
@@ -378,14 +378,6 @@ int main(int argc, char **argv)
         return -1;
     }
 
-    //cryptTest();
-    //Testing Key and IV values
-    /* A 256 bit key */
-    unsigned char *key = (unsigned char *)"01234567890123456789012345678901";
-
-    /* A 128 bit IV */
-    unsigned char *iv = (unsigned char *)"0123456789012345";
-
     //TODO
     //1. Initialize IV/KEY information between devices (depending on device, one sends one recives should be done in if statements)
 
@@ -474,11 +466,13 @@ int main(int argc, char **argv)
                 exit(1);
             }
         }
+
         close(client_crypto.write_fd);
         close(client_crypto.read_fd);
     }
 
     if (strchr(argv[1], 'b') != NULL) {
+
         //If user inputs B then we read b write a
         struct jhu_crypto_client client_crypto = init_client_crypto('b', devname_a, devname_b);
         bool is_ready = client_crypto.is_crypto_initialized && client_crypto.is_read_client_ready && client_crypto.is_write_client_ready;
@@ -555,9 +549,11 @@ int main(int argc, char **argv)
                 exit(1);
             }
         }
+
         close(client_crypto.write_fd);
         close(client_crypto.read_fd);
     }
+
     if (strchr(argv[1], 't') != NULL) {
 
         // Init
@@ -659,37 +655,74 @@ int main(int argc, char **argv)
         char msg_1024[] = "dO1bLdFZuABpJ2nwfvKSPUfmoTPWVVUS1WTCEaPKJmILUj1pRx3HEueHuIhlC9nE2v3XWEuxijw2tJSTJiozuWSYEfFEvpvjBnqx9eeIx5UWEH27M1FqIhQRQcftwB2V5Xo8EpkZ47NSZ4FzQSPtORjuyT9aaZFrR7NV1ESkR7ZvTYMBdib3biAc4MOOfJDvNNDqM4NMS4BqFGJuIPL8dIyNrGXd5AwUX5qUPsYR2EDSmic6wQXAermGtmXgncqJKeMVmgO3zXm9LvIatTZHxRT7WSMeg1bOEYCVs3S5byEZdJV37cTNPoP27L4oJOhAVCWrWAl3o1jllzm2oTOIXgeZ3v43sgZ6PXaf5k93t5VbdYHUooeWXb2B3S4U2SsRVaHQBpsUSrXpGPpLVp0MstTHqIYdnhkGpdLMv6pMMQP22T9tencSdOtcsBkQF1tkMAIbzuPvJzJVMsuQ15MjzZUnQQ8cXeLwnZeFdqMeigIr8aSXvAgOTPJJIijVBxpMQo8nArqT7aOfsXzDUMkEgCN9rh2CPYbhGYegcin2gKsFxxpDaCxaukmMkqhamZaaklJXoi3XeBrmY15wiReU6xsjjPaDEOYn1vFXbwXN12exfVg0MLwTTlCmGUCXbQzBQa3omVLQ94z91I7obVTFdq5JOYV1wDuQDuPQdsChLmz933k9Vqr7er7pPK3iLMpYQ0igGDKNxc1J7UtsoOxAszW1QAEZYhIpTtIGWYV5gUifbVNw5c6F3dPN5HHPCOkpG4SBtLKagdnbk7toNK1LsKdTKHEQ6pTLq6zKHt5MG7AxnoPqH1jU05UNui74wPUL2A1QB9lPGPIdrT041z1LDqOqS1gCIcCkmcXAwoOx4ISMZOIJtlQGXA5RvyJbCVarvLjR8fsu14Tp2ygmHcOd45xsKDwZEtaGRhWRbu70DEGULK8rt3sYYqCUbmPCvr5WWovhDsWNIERssUrwEewzdpN6ieCrdy4xNQDXoJgn0JP5FMNKNjl8bRKQNxKhIeg9";
         char msg_512_a[] = "UBJAypUPyQICrVC1bYigZeozibRxuNWZZlwANoNkoGjdeztxAtNXdKhKBKVTaSvfdIficGWNI7JHTiUmwKiOPLrITrLriV8apbbrq8ACFtwJt1nndYEsA7IK4uj1INo1P1rlhqzHN9qkp1qaIcA5ZB3uoHZaycEJw3VFrqw7yLHTKV5Eu9TiQ2Jlv4VSvgnodG0SIrchZO7oeAP7svBoZ9FwYmPOVZmBslMtL1xHFdcQOcunkPQwzGKH9ndH8y0LNOvXOIt6m7t3kuDDQdoV0s2sI1WscymNYMVduCOAXWrQ2KZ2vrZtUtiejIH3O1tNizChHP0k7tOmaD8xEZmPrstRliCZqBUrxHnuIrgKrKhZAmyEEcs4j5TnHzkDkYcVOOcXTOOhtQ70K1K7Ja7AN5EWxDiJicNtn1mkyYjiSsMOEwSY0TZoaYfX9a2GuRUzLUa8qegnk87sq5AD9Qbbws8xeOT2yWTgogBgvKrJqdkyQ0a01l4ZIXN0bg75aKWp";
         char msg_512_b[] = "0gXAADTDsp5eUtyCrxG3XqtVWJ1ShAlu5tvbBfQF3EibtExjRe7nUWyQrrjrYN6cn8Mv6epmz4yBnfYaHdqiVdPM2QIOFGm46iBtLVd12h9QO1u14jG33w4AnFYUEwVjIltiTlqU040Pqu9za2NlrZt8ng4AqSENHUQ3LeJF0z4chjut0pHVBZEMKcPoaofaxyC0a6WpBiyX4H2P5nTGdspfU5zMWjIGLuRiZHZnyfLtHg6gnPhg8OOWijR1V63ajuNzvEgAtCUFZYKA92Zrimog9bqoqn4aJ4omdhRhnqe6Jezx1AsVGkS0DWLELXPgxJuESs4OQf77dIdvytbusounhLiiZfLMsxleKloYLVmDMM90M28hyKareDa2iuXMJpznisH4tqVJBNrd0alZr15rKSY0HTKDnqDLuGATNyY0XSBaiBnrQAX0Qc9wb6ugtuEC2ZZ33fGURYaJ1U6nBhrjftWXhegPiz6dPWDxmhuyg7keX5EcSJDoCMxtmRHX";
-        char msg_2[] = "Hello";
-        // write(fd_aw, msg_1024, sizeof(msg_1024));
-        // write(fd_aw, msg_2, sizeof(msg_2));
-        char userInput[512];
-        fgets(userInput, 512, stdin);
+        char msg_5[] = "Hello";
+        char read_msg[JHU_IOCTL_MESSAGE_LIMIT + 1] = {0};
+
+        // Full 1024 Test Case
+        printf("\n");
+        memset(read_msg, 0, JHU_IOCTL_MESSAGE_LIMIT);
+        write(fd_aw, msg_1024, strlen(msg_1024));
+        write(fd_aw, msg_5, strlen(msg_5));
+        read(fd_br, read_msg, JHU_IOCTL_MESSAGE_LIMIT);
+        read_msg[JHU_IOCTL_MESSAGE_LIMIT] = '\0';
+        printf("Read Msg 1024 %s %zu\n", read_msg, strlen(msg_1024));
+
+        // Full 512 Chunked Case
+        printf("\n");
+        memset(read_msg, 0, JHU_IOCTL_MESSAGE_LIMIT);
+        write(fd_aw, msg_512_a, strlen(msg_512_a));
+        write(fd_aw, msg_512_b, strlen(msg_512_b));
+        write(fd_aw, msg_5, strlen(msg_5));
+        read(fd_br, read_msg, JHU_IOCTL_MESSAGE_LIMIT);
+        read_msg[JHU_IOCTL_MESSAGE_LIMIT] = '\0';
+        printf("Read Msg 512 %s %zu\n", read_msg, strlen(read_msg));
+
+        // Partial 5 Chunked Case
+        printf("\n");
+        memset(read_msg, 0, JHU_IOCTL_MESSAGE_LIMIT);
+        write(fd_aw, msg_5, strlen(msg_5));
+        read(fd_br, read_msg, strlen(msg_5));
+        read_msg[JHU_IOCTL_MESSAGE_LIMIT] = '\0';
+        printf("Read Msg 5 %s %zu\n", read_msg, strlen(read_msg));
+
+        // Encryption Tests
+        printf("Type Something to Test Encryption/Decryption \n");
+
+        /* A 256 bit key */
+        unsigned char *key = (unsigned char *)"01234567890123456789012345678901";
+
+        /* A 128 bit IV */
+        unsigned char *iv = (unsigned char *)"0123456789012345";
+
+        // Get user input
+        char userInput[JHU_IOCTL_MESSAGE_LIMIT] = {0};
+        fgets(userInput, JHU_IOCTL_MESSAGE_LIMIT, stdin);
+        userInput[strcspn(userInput, "\r\n")] = 0; // https://stackoverflow.com/a/28462221
+        userInput[JHU_IOCTL_MESSAGE_LIMIT] = '\0';
 
         int ciphertext_len;
-        unsigned char ciphertext[512];
+        unsigned char ciphertext[JHU_IOCTL_MESSAGE_LIMIT * 2];
+        ciphertext_len = encrypt(userInput, strlen(userInput), key, iv, ciphertext);
+        printf("Encrypted \"%s\" is:\n", userInput);
+        BIO_dump_fp(stdout, ciphertext, ciphertext_len);
 
-        ciphertext_len = encrypt(userInput, strlen((char *)userInput), key, iv, ciphertext);
-
+        memset(read_msg, 0, JHU_IOCTL_MESSAGE_LIMIT);
         write(fd_aw, ciphertext, ciphertext_len);
-        //write(fd_aw, msg_512_b, sizeof(msg_512_b) - 1);
-        char read_msg[1025];
-        read(fd_br, read_msg, 1024);
-        read_msg[1024] = '\0';
-        printf("Read msg %s %zu\n", read_msg, strlen(read_msg));
+        int num_read = read(fd_br, read_msg, JHU_IOCTL_MESSAGE_LIMIT);
+        printf("Encrypted Content from Kernel is:\n");
+        BIO_dump_fp(stdout, read_msg, ciphertext_len);
 
         int decryptedtext_len;
-        unsigned char decryptedtext[1025];
+        unsigned char decryptedtext[JHU_IOCTL_MESSAGE_LIMIT * 2];
 
         // Decrypt the ciphertext
-        decryptedtext_len = decrypt(read_msg, strlen((char *)read_msg), key, iv, decryptedtext);
+        decryptedtext_len = decrypt(read_msg, num_read, key, iv, decryptedtext);
 
         // Add a NULL terminator. We are expecting printable text
         decryptedtext[decryptedtext_len] = '\0';
 
         // Show the decrypted text
-        printf("Decrypted text is:\n");
-        printf("%s\n", decryptedtext);
-        //printf("[b] %s, decryptThingsFromB);
+        printf("Decrypted Read is:\n%s\n", decryptedtext);
 
         close(fd_aw);
         close(fd_bw);
