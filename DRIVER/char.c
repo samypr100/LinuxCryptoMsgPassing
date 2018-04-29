@@ -478,7 +478,7 @@ static ssize_t dev_write(struct file *filep, const char __user *buffer, size_t l
 long dev_ioctl(struct file *filep, unsigned int ioctl_num, unsigned long ioctl_param)
 {
     int error = 0;
-    struct jhu_ioctl_crypto *temp_evp = NULL;
+    struct jhu_ioctl_crypto __user *temp_evp = NULL;
     struct dev_private_data *priv_data = filep->private_data; // device should be opened at this stage...
 
     // better safe than sorry
@@ -491,7 +491,7 @@ long dev_ioctl(struct file *filep, unsigned int ioctl_num, unsigned long ioctl_p
     switch (ioctl_num) {
     case IOCTL_READ_FROM_KERNEL:
         printk(KERN_INFO "[*]    IOCTL_READ_FROM_KERNEL\n");
-        temp_evp = (struct jhu_ioctl_crypto *)ioctl_param;
+        temp_evp = (struct jhu_ioctl_crypto __user *)ioctl_param;
 
         if (*priv_data->current_crypto_initialized == false) {
             printk(KERN_WARNING "[*]    Crypto not initialized yet.\n");
@@ -530,7 +530,7 @@ long dev_ioctl(struct file *filep, unsigned int ioctl_num, unsigned long ioctl_p
         break;
     case IOCTL_WRITE_TO_KERNEL:
         printk(KERN_INFO "[*]    IOCTL_WRITE_TO_KERNEL\n");
-        temp_evp = (struct jhu_ioctl_crypto *)ioctl_param;
+        temp_evp = (struct jhu_ioctl_crypto __user *)ioctl_param;
 
         // Clear Data Remnants (Prevents Unstable Write/Read)
         (*priv_data->current_crypto_initialized) = false;
