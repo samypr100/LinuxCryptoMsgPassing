@@ -39,17 +39,8 @@ struct jhu_crypto_client {
     struct jhu_ioctl_crypto write_crypto_info;
 } __attribute__((__packed__));
 
-// SMATOS2, EFORTE3 Modified from https://wiki.openssl.org/index.php/EVP_Symmetric_Encryption_and_Decryption#Encrypting_the_message
-void handleErrors(void)
-{
-    // printf("An error occured with the encryption, and my error handling is bad\n");
-    ERR_print_errors_fp(stderr);
-    //printf(stderr);
-    abort();
-}
-
-int encrypt(unsigned char *plaintext, int plaintext_len, unsigned char *key,
-            unsigned char *iv, unsigned char *ciphertext)
+// SMATOS2, EFORTE3 Taken/Mofified from https://wiki.openssl.org/index.php/EVP_Symmetric_Encryption_and_Decryption#Encrypting_the_message
+int encrypt(unsigned char *plaintext, int plaintext_len, unsigned char *key, unsigned char *iv, unsigned char *ciphertext)
 {
     EVP_CIPHER_CTX *ctx;
 
@@ -59,35 +50,39 @@ int encrypt(unsigned char *plaintext, int plaintext_len, unsigned char *key,
 
     /* Create and initialise the context */
     if (!(ctx = EVP_CIPHER_CTX_new())) {
-        // printf("Error on Initlaizing the encryption Context\n");
-        handleErrors();
+        ERR_print_errors_fp(stderr);
+        return -1;
     }
 
     /* Initialise the encryption operation. IMPORTANT - ensure you use a key
-     * and IV size appropriate for your cipher
-     * In this example we are using 256 bit AES (i.e. a 256 bit key). The
-     * IV size for *most* modes is the same as the block size. For AES this
-     * is 128 bits */
+   * and IV size appropriate for your cipher
+   * In this example we are using 256 bit AES (i.e. a 256 bit key). The
+   * IV size for *most* modes is the same as the block size. For AES this
+   * is 128 bits */
     if (1 != EVP_EncryptInit_ex(ctx, EVP_aes_256_cbc(), NULL, key, iv)) {
-        // printf("Error on Initializing encryption operation\n");
-        handleErrors();
+        ERR_print_errors_fp(stderr);
+        EVP_CIPHER_CTX_free(ctx);
+        return -1;
     }
+
     /* Provide the message to be encrypted, and obtain the encrypted output.
-     * EVP_EncryptUpdate can be called multiple times if necessary
-     */
+   * EVP_EncryptUpdate can be called multiple times if necessary
+   */
     if (1 != EVP_EncryptUpdate(ctx, ciphertext, &len, plaintext, plaintext_len)) {
-        // printf("Error on add adding message to be encrypted\n");
-        handleErrors();
+        ERR_print_errors_fp(stderr);
+        EVP_CIPHER_CTX_free(ctx);
+        return -1;
     }
 
     ciphertext_len = len;
 
     /* Finalise the encryption. Further ciphertext bytes may be written at
-     * this stage.
-     */
+   * this stage.
+   */
     if (1 != EVP_EncryptFinal_ex(ctx, ciphertext + len, &len)) {
-        // printf("Error on add final encryption bytes\n");
-        handleErrors();
+        ERR_print_errors_fp(stderr);
+        EVP_CIPHER_CTX_free(ctx);
+        return -1;
     }
 
     ciphertext_len += len;
@@ -98,8 +93,8 @@ int encrypt(unsigned char *plaintext, int plaintext_len, unsigned char *key,
     return ciphertext_len;
 }
 
-int decrypt(unsigned char *ciphertext, int ciphertext_len, unsigned char *key,
-            unsigned char *iv, unsigned char *plaintext)
+// SMATOS2, EFORTE3 Taken/Mofified from https://wiki.openssl.org/index.php/EVP_Symmetric_Encryption_and_Decryption#Decrypting_the_Message
+int decrypt(unsigned char *ciphertext, int ciphertext_len, unsigned char *key, unsigned char *iv, unsigned char *plaintext)
 {
     EVP_CIPHER_CTX *ctx;
 
@@ -108,37 +103,40 @@ int decrypt(unsigned char *ciphertext, int ciphertext_len, unsigned char *key,
     int plaintext_len;
 
     /* Create and initialise the context */
-    if (!(ctx = EVP_CIPHER_CTX_new()))
-        // printf("Error on Initlaizing the decrypiton Context\n");
-        handleErrors();
+    if (!(ctx = EVP_CIPHER_CTX_new())) {
+        ERR_print_errors_fp(stderr);
+        return -1;
+    }
 
     /* Initialise the decryption operation. IMPORTANT - ensure you use a key
-    * and IV size appropriate for your cipher
-    * In this example we are using 256 bit AES (i.e. a 256 bit key). The
-    * IV size for *most* modes is the same as the block size. For AES this
-    * is 128 bits */
+   * and IV size appropriate for your cipher
+   * In this example we are using 256 bit AES (i.e. a 256 bit key). The
+   * IV size for *most* modes is the same as the block size. For AES this
+   * is 128 bits */
     if (1 != EVP_DecryptInit_ex(ctx, EVP_aes_256_cbc(), NULL, key, iv)) {
-        // printf("Error on Initlaizing the decrypiton operation\n");
-        handleErrors();
+        ERR_print_errors_fp(stderr);
+        EVP_CIPHER_CTX_free(ctx);
+        return -1;
     }
 
     /* Provide the message to be decrypted, and obtain the plaintext output.
-    * EVP_DecryptUpdate can be called multiple times if necessary
-    */
+   * EVP_DecryptUpdate can be called multiple times if necessary
+   */
     if (1 != EVP_DecryptUpdate(ctx, plaintext, &len, ciphertext, ciphertext_len)) {
-        // printf("Error on adding message to be decrypted\n");
-        handleErrors();
+        ERR_print_errors_fp(stderr);
+        EVP_CIPHER_CTX_free(ctx);
+        return -1;
     }
 
     plaintext_len = len;
 
     /* Finalise the decryption. Further plaintext bytes may be written at
-    * this stage.
-    */
-
+   * this stage.
+   */
     if (1 != EVP_DecryptFinal_ex(ctx, plaintext + len, &len)) {
-        // printf("Error on adding final decrytped bytes\n");
-        handleErrors();
+        ERR_print_errors_fp(stderr);
+        EVP_CIPHER_CTX_free(ctx);
+        return -1;
     }
 
     plaintext_len += len;
@@ -148,46 +146,6 @@ int decrypt(unsigned char *ciphertext, int ciphertext_len, unsigned char *key,
 
     return plaintext_len;
 }
-
-// SMATOS2, EFORTE3 encrypt for driverFunction
-
-//int D_encrypt(unsigned char *plaintext,unsigned char *key,unsigned char *iv,unsigned char *ciphertextBuf)
-/*
-{
-    int ciphertext_len;
-
-    //Buffer For ciphertext
-    unsigned char ciphertext[128];
-
-    ciphertext_len = encrypt (plaintext, strlen ((char *)plaintext), key, iv, ciphertext);
-
-
-    printf("Ciphertext is:\n");
-    BIO_dump_fp (stdout, (const char *)ciphertext, ciphertext_len);
-
-    ciphertextBuf = ciphertext;
-
-    return ciphertext_len;
-}
-*/
-
-// SMATOS2, EFORTE3 decrypt for driverFunction
-/*
-char * D_decrypt(unsigned char *ciphertext,unsigned char *key,unsigned char *iv)
-{
-    int decryptedtext_len;
-
-    // Buffer for the decrypted text 
-    unsigned char decryptedtext[128];
-
-    decryptedtext_len = decrypt(ciphertext, strlen ((char *)ciphertext), key, iv, decryptedtext);
-
-    // Add a NULL terminator. We are expecting printable text 
-    decryptedtext[decryptedtext_len] = '\0';
-
-    return decryptedtext;
-}
-*/
 
 // SMATOS2, EFORTE3 Crypt Test Function
 int cryptTest(void)
