@@ -90,6 +90,8 @@
 
 #define JHU_IOCTL_CRYPTO_IV_CHAR_LEN 16
 
+#define JHU_IOCTL_MESSAGE_LIMIT 1024
+
 #define JHU_IOCTL_CRYPTO
 struct jhu_ioctl_crypto
 {
