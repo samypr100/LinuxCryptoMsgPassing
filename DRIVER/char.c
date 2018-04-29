@@ -258,7 +258,7 @@ static int dev_open(struct inode *inodep, struct file *filep)
     // Check Capability before allowing open
     if (!capable(CAP_SECRET_FOURONETWO)) {
         printk(KERN_WARNING "[*]    Invalid Capability\n");
-        //return -EPERM; TODO UNCOMMENT ME TO ENFORCE THIS LATER AFTER FINALIZING THE MODULE
+        return -EPERM;
     }
 
     // SMATOS2, EFORTE3
@@ -406,8 +406,6 @@ static ssize_t dev_read(struct file *filep, char __user *buffer, size_t len, lof
     memset(priv_data->current_msg, 0, MAX_ALLOWED_MESSAGE); // clear message
     (*priv_data->current_offset) = 0;                       // revert offset
 
-    // TODO: should the message be partitioned after read (e.g. shift the non-read bytes at the beggining of the file)? Instructions were not specific
-
     // SMATOS2, EFORTE3: Free
     kfree(kbuf);                           // Release Kernel Buffer
     mutex_unlock(priv_data->current_lock); // Unlock Read/Write Operations to the Device
@@ -554,7 +552,6 @@ long dev_ioctl(struct file *filep, unsigned int ioctl_num, unsigned long ioctl_p
             printk(KERN_DEBUG "[*]    IV READ\n");
             print_hex_dump(KERN_DEBUG, "[*]    ", DUMP_PREFIX_NONE, 16, 1, priv_data->current_crypto->IV, JHU_IOCTL_CRYPTO_IV_CHAR_LEN, true);
 
-            // TODO Determine if this is best approach
             // SMATOS2, EFORTE3
             // Clear Data Remnants to prevent unstable read/write or another process from reading KEY/IV information
             // Once KEY/IV information is read, it can't be read again and message buffer will be flushed
@@ -636,18 +633,6 @@ static int dev_release(struct inode *inodep, struct file *filep)
     is_write = priv_data->is_open_for_write;
     is_read = priv_data->is_open_for_read;
     device_role = is_write ? "Write" : is_read ? "Read" : "N/A";
-
-    // TODO Should we delete data remnants here or in the IOCTL READ/WRITE?
-    // Writer Closed, Cleanup KEY/IV received and any message sent.
-    // There should be nothing to read anymore for the reader...
-    // if (priv_data->is_open_for_write) {
-    //     printk("[*] Deleting data for %s\n", device_name);
-    //     (*priv_data->current_offset) = 0;                                         // Clear Device Specific Message Offset
-    //     (*priv_data->current_crypto_initialized) = false;                         // Clear Device Specific Crypto Initialization Flag
-    //     memset(priv_data->current_msg, 0, MAX_ALLOWED_MESSAGE);                   // Clear Device Specific Message Buffer
-    //     memset(priv_data->current_crypto->KEY, 0, JHU_IOCTL_CRYPTO_KEY_CHAR_LEN); // Clear Device Specific KEY
-    //     memset(priv_data->current_crypto->IV, 0, JHU_IOCTL_CRYPTO_IV_CHAR_LEN);   // Clear Device Specific IV
-    // }
 
     // SMATOS2, EFORTE3: Cleanup Private Device Data
     filep->private_data = NULL;
