@@ -354,7 +354,7 @@ struct jhu_crypto_client init_client_crypto(char client, char *devname_a, char *
 int ioctl_set_data(int fd, const unsigned char *key, const unsigned char *IV)
 {
 
-    printf("[+] %s called\n", __FUNCTION__);
+    // printf("[+] %s called\n", __FUNCTION__);
 
     // SMATOS2, EFORTE3: Create jhu_ioctl_crypto based on Input
     struct jhu_ioctl_crypto crypto_info;
@@ -362,10 +362,10 @@ int ioctl_set_data(int fd, const unsigned char *key, const unsigned char *IV)
     strncpy(crypto_info.IV, IV, JHU_IOCTL_CRYPTO_IV_CHAR_LEN);
 
     // SMATOS2, EFORTE3: Print Key/IV for debugging purposes
-    printf("[+] Key Written is:\n");
-    BIO_dump_fp(stdout, crypto_info.KEY, JHU_IOCTL_CRYPTO_KEY_CHAR_LEN);
-    printf("[+] IV Written is:\n");
-    BIO_dump_fp(stdout, crypto_info.IV, JHU_IOCTL_CRYPTO_IV_CHAR_LEN);
+    // printf("[+] Key Written is:\n");
+    // BIO_dump_fp(stdout, crypto_info.KEY, JHU_IOCTL_CRYPTO_KEY_CHAR_LEN);
+    // printf("[+] IV Written is:\n");
+    // BIO_dump_fp(stdout, crypto_info.IV, JHU_IOCTL_CRYPTO_IV_CHAR_LEN);
 
     // SMATOS2, EFORTE3: Send IOCTL command
     ioctl(fd, IOCTL_WRITE_TO_KERNEL, &crypto_info);
@@ -378,16 +378,16 @@ int ioctl_set_data(int fd, const unsigned char *key, const unsigned char *IV)
 int ioctl_read_data(int fd, struct jhu_ioctl_crypto *crypto_info)
 {
 
-    printf("[+] %s called\n", __FUNCTION__);
+    // printf("[+] %s called\n", __FUNCTION__);
 
     // SMATOS2, EFORTE3: Send IOCTL command
     ioctl(fd, IOCTL_READ_FROM_KERNEL, crypto_info);
 
     // SMATOS2, EFORTE3: Print Key/IV for debugging purposes
-    printf("[+] Key Read is:\n");
-    BIO_dump_fp(stdout, crypto_info->KEY, JHU_IOCTL_CRYPTO_KEY_CHAR_LEN);
-    printf("[+] IV Read is:\n");
-    BIO_dump_fp(stdout, crypto_info->IV, JHU_IOCTL_CRYPTO_IV_CHAR_LEN);
+    // printf("[+] Key Read is:\n");
+    // BIO_dump_fp(stdout, crypto_info->KEY, JHU_IOCTL_CRYPTO_KEY_CHAR_LEN);
+    // printf("[+] IV Read is:\n");
+    // BIO_dump_fp(stdout, crypto_info->IV, JHU_IOCTL_CRYPTO_IV_CHAR_LEN);
 
     return 0;
 }

@@ -63,8 +63,10 @@ static int g_offset_a = 0;                          // Serve's as the 'seek' for
 static int g_offset_b = 0;                          // Serve's as the 'seek' for g_msg_b to know up to where it has been written to.
 static struct jhu_ioctl_crypto g_crypto_info_a;     // Holds Crypto Info for Device A
 static struct jhu_ioctl_crypto g_crypto_info_b;     // Holds Crypto Info for Device B
-static bool g_crypto_initialized_a = false;         // Flag that determines if Crypt Info has been Written for Device A
-static bool g_crypto_initialized_b = false;         // Flag that determines if Crypt Info has been Written for Device B
+static bool g_crypto_read_ready_a = false;          // Flag that determines if Crypt Info has been Read for Device A
+static bool g_crypto_read_ready_b = false;          // Flag that determines if Crypt Info has been Read for Device B
+static bool g_crypto_write_ready_a = false;         // Flag that determines if Crypt Info has been Written for Device A
+static bool g_crypto_write_ready_b = false;         // Flag that determines if Crypt Info has been Written for Device B
 static DEFINE_MUTEX(g_lock_a);                      // Holds Global Lock for Device A
 static DEFINE_MUTEX(g_lock_b);                      // Holds Global Lock for Device B
 
@@ -97,17 +99,16 @@ static struct file_operations fops =
         .unlocked_ioctl = dev_ioctl,
         .release = dev_release,
 };
-
+char device_name[] = "DEVICEA";
 // SMATOS2, EFORTE3: per-device data, this populates per each "open" call
 // This private data is used to handle state across open/read/write/ioctl operations.
 struct dev_private_data {
     bool is_open_for_read;                   // Use to determine if this Device is Opened for Read (Per Open Call)
     bool is_open_for_write;                  // Use to determine if this Device is Opened for Write (Per Open Call)
-    bool is_key_initialized;                 // Use to determine if this Device has Key Information (Per Open Call)
-    bool is_iv_initialized;                  // Use to determine if this Device has IV Information (Per Open Call)
     int major;                               // This Device Major Num (Per Open Call)
     int minor;                               // This Device Minor Num (Per Open Call)
-    bool *current_crypto_initialized;        // Holds Reference to the Global Crypto Info Init Flag for the Proper Device (Per Device Pointer)
+    bool *current_crypto_read_ready;         // Holds Reference to the Global Crypto Info Read Flag for the Proper Device (Per Device Pointer)
+    bool *current_crypto_write_ready;        // Holds Reference to the Global Crypto Info Write Flag for the Proper Device (Per Device Pointer)
     int *current_offset;                     // Holds Reference to the Global Message Seek for the Proper Device (Per Device Pointer)
     char *current_msg;                       // Holds Reference to the Global Message for the Proper Device (Per Device Pointer)
     struct mutex *current_lock;              // Holds Reference to the Global Lock for the Proper Device (Per Device Pointer)
@@ -249,6 +250,8 @@ static int dev_open(struct inode *inodep, struct file *filep)
     // SMATOS2, EFORTE3: Initialize Locals (Including pointer to private data)
     struct dev_private_data *priv_data = filep->private_data;
     bool is_open_read, is_open_write, is_open_valid, is_valid_device;
+    char device_name[10]; // Friendly Name
+    char device_role[6];  // Place Holder to hold the word "Read or Write"
     //
     // Add your checking to this code path
     //
@@ -288,11 +291,14 @@ static int dev_open(struct inode *inodep, struct file *filep)
     priv_data->minor = iminor(inodep); // if we decide to use it...
     priv_data->is_open_for_read = is_open_read ? true : false;
     priv_data->is_open_for_write = is_open_write ? true : false;
+    strcpy(device_name, (priv_data->major == g_majornum_a) ? "Device A" : (priv_data->major == g_majornum_b) ? "Device B" : "UNKNOWN");
+    strcpy(device_role, is_open_write ? "Write" : is_open_read ? "Read" : "N/A");
 
     // SMATOS2, EFORTE3: Initialize Device Dependent Global Pointers to Private Data for Easy Reference
     // Current means "Current Device"
     if (priv_data->major == g_majornum_a) {
-        priv_data->current_crypto_initialized = &g_crypto_initialized_a;
+        priv_data->current_crypto_write_ready = &g_crypto_write_ready_a;
+        priv_data->current_crypto_read_ready = &g_crypto_read_ready_a;
         priv_data->current_crypto = &g_crypto_info_a;
         priv_data->current_lock = &g_lock_a;
         priv_data->current_offset = &g_offset_a;
@@ -302,18 +308,15 @@ static int dev_open(struct inode *inodep, struct file *filep)
     // SMATOS2, EFORTE3: Initialize Device Dependent Global Pointers to Private Data for Easy Reference
     // Current means "Current Device"
     if (priv_data->major == g_majornum_b) {
-        priv_data->current_crypto_initialized = &g_crypto_initialized_b;
+        priv_data->current_crypto_write_ready = &g_crypto_write_ready_b;
+        priv_data->current_crypto_read_ready = &g_crypto_read_ready_b;
         priv_data->current_crypto = &g_crypto_info_b;
         priv_data->current_lock = &g_lock_b;
         priv_data->current_offset = &g_offset_b;
         priv_data->current_msg = g_msg_b;
     }
 
-    printk(KERN_INFO "[*]    Successfully Opened Device\n");
-    printk(KERN_DEBUG "[*]    Init State {isRead: %d, isWrite: %d, isKey: %d, isIV: %d, major: %d, minor: %d}\n",
-           priv_data->is_open_for_read, priv_data->is_open_for_write,
-           priv_data->is_key_initialized, priv_data->is_iv_initialized,
-           priv_data->major, priv_data->minor);
+    printk(KERN_INFO "[*]    Successfully Opened %s for %s\n", device_name, device_role);
 
     // SMATOS2, EFORTE3: Assign Newly Created Private Data to the private_data pointer.
     filep->private_data = priv_data;
@@ -349,7 +352,7 @@ static ssize_t dev_read(struct file *filep, char __user *buffer, size_t len, lof
     }
 
     // SMATOS2, EFORTE3: verify if we can read and crypto has been initialized properly
-    can_read = priv_data->is_open_for_read && priv_data->is_key_initialized && priv_data->is_iv_initialized;
+    can_read = priv_data->is_open_for_read && *priv_data->current_crypto_read_ready == true && *priv_data->current_crypto_write_ready == true;
     if (!can_read) {
         printk(KERN_WARNING "[*]    Unable to read data because state is not ready.\n");
         return -EAGAIN;
@@ -444,7 +447,7 @@ static ssize_t dev_write(struct file *filep, const char __user *buffer, size_t l
     }
 
     // SMATOS2, EFORTE3: verify if we can write and it's initialized properly
-    can_write = priv_data->is_open_for_write && priv_data->is_key_initialized && priv_data->is_iv_initialized;
+    can_write = priv_data->is_open_for_write && *priv_data->current_crypto_read_ready == true && *priv_data->current_crypto_write_ready == true;
     if (!can_write) {
         printk(KERN_WARNING "[*]    Unable to write data because state is not ready.\n");
         return -EAGAIN;
@@ -534,7 +537,8 @@ long dev_ioctl(struct file *filep, unsigned int ioctl_num, unsigned long ioctl_p
             temp_evp = (struct jhu_ioctl_crypto __user *)ioctl_param; // SMATOS2, EFORTE3: Get the usermode argument
 
             // SMATOS2, EFORTE3: Verify if the crypto information has been initialized for the device (an IOCTL write has to be successful)
-            if (*priv_data->current_crypto_initialized == false) {
+            (*priv_data->current_crypto_read_ready) = false; // Clear Device Specific Crypto Read Ready Flag
+            if (*priv_data->current_crypto_write_ready == false) {
                 printk(KERN_WARNING "[*]    Crypto not initialized yet.\n");
                 return -EAGAIN;
             }
@@ -544,8 +548,6 @@ long dev_ioctl(struct file *filep, unsigned int ioctl_num, unsigned long ioctl_p
             if (error) {
                 return -EFAULT;
             }
-            priv_data->is_key_initialized = true; // Set that this FD KEY info has been read
-            priv_data->is_iv_initialized = true;  // Set that this FD IV info has been read
 
             printk(KERN_DEBUG "[*]    KEY READ\n");
             print_hex_dump(KERN_DEBUG, "[*]    ", DUMP_PREFIX_NONE, 16, 1, priv_data->current_crypto->KEY, JHU_IOCTL_CRYPTO_KEY_CHAR_LEN, true);
@@ -553,18 +555,13 @@ long dev_ioctl(struct file *filep, unsigned int ioctl_num, unsigned long ioctl_p
             print_hex_dump(KERN_DEBUG, "[*]    ", DUMP_PREFIX_NONE, 16, 1, priv_data->current_crypto->IV, JHU_IOCTL_CRYPTO_IV_CHAR_LEN, true);
 
             // SMATOS2, EFORTE3
-            // Clear Data Remnants to prevent unstable read/write or another process from reading KEY/IV information
+            // Clear data remnants to prevent unstable read/write or another process from reading KEY/IV information
             // Once KEY/IV information is read, it can't be read again and message buffer will be flushed
             (*priv_data->current_offset) = 0;                                         // Clear Device Specific Message Offset
-            (*priv_data->current_crypto_initialized) = false;                         // Clear Device Specific Crypto Initialization Flag
+            (*priv_data->current_crypto_read_ready) = true;                           // Clear Device Specific Crypto Ready Flag
             memset(priv_data->current_msg, 0, MAX_ALLOWED_MESSAGE);                   // Clear Device Specific Message Buffer
             memset(priv_data->current_crypto->KEY, 0, JHU_IOCTL_CRYPTO_KEY_CHAR_LEN); // Clear Device Specific KEY
             memset(priv_data->current_crypto->IV, 0, JHU_IOCTL_CRYPTO_IV_CHAR_LEN);   // Clear Device Specific IV
-
-            printk(KERN_DEBUG "[*]    Post Read State {isRead: %d, isWrite: %d, isKey: %d, isIV: %d, major: %d, minor: %d}\n",
-                   priv_data->is_open_for_read, priv_data->is_open_for_write,
-                   priv_data->is_key_initialized, priv_data->is_iv_initialized,
-                   priv_data->major, priv_data->minor);
 
             break;
         // SMATOS2, EFORTE3: Used to WRITE KEY/IV Information
@@ -572,9 +569,10 @@ long dev_ioctl(struct file *filep, unsigned int ioctl_num, unsigned long ioctl_p
             printk(KERN_INFO "[*]    IOCTL_WRITE_TO_KERNEL\n");
             temp_evp = (struct jhu_ioctl_crypto __user *)ioctl_param; // SMATOS2, EFORTE3: Get the usermode argument
 
-            // SMATOS2, EFORTE3 Clear Data Remnants to prevents unstable Read/Write
+            // SMATOS2, EFORTE3 Clear data remnants to prevent unstable Read/Write
             (*priv_data->current_offset) = 0;                                         // Clear Device Specific Message Offset
-            (*priv_data->current_crypto_initialized) = false;                         // Clear Device Specific Crypto Initialization Flag
+            (*priv_data->current_crypto_read_ready) = false;                          // Clear Device Specific Crypto Read Ready Flag
+            (*priv_data->current_crypto_write_ready) = false;                         // Clear Device Specific Crypto Write Ready Flag
             memset(priv_data->current_msg, 0, MAX_ALLOWED_MESSAGE);                   // Clear Device Specific Message Buffer
             memset(priv_data->current_crypto->KEY, 0, JHU_IOCTL_CRYPTO_KEY_CHAR_LEN); // Clear Device Specific KEY
             memset(priv_data->current_crypto->IV, 0, JHU_IOCTL_CRYPTO_IV_CHAR_LEN);   // Clear Device Specific IV
@@ -586,21 +584,14 @@ long dev_ioctl(struct file *filep, unsigned int ioctl_num, unsigned long ioctl_p
                 memset(priv_data->current_crypto->IV, 0, JHU_IOCTL_CRYPTO_IV_CHAR_LEN);   // Clear memory after error
                 return -EFAULT;
             }
-            priv_data->is_key_initialized = true; // Set that this FD KEY info has been written
-            priv_data->is_iv_initialized = true;  // Set that this FD IV info has been written
 
             // SMATOS2, EFORTE3: Indicate that Crypto Info has been written to Device
-            (*priv_data->current_crypto_initialized) = true;
+            (*priv_data->current_crypto_write_ready) = true;
 
-            printk(KERN_DEBUG "[*]    KEY WRITEN\n");
+            printk(KERN_DEBUG "[*]    KEY WRITTEN\n");
             print_hex_dump(KERN_DEBUG, "[*]    ", DUMP_PREFIX_NONE, 16, 1, priv_data->current_crypto->KEY, JHU_IOCTL_CRYPTO_KEY_CHAR_LEN, true);
-            printk(KERN_DEBUG "[*]    IV WRITEN\n");
+            printk(KERN_DEBUG "[*]    IV WRITTEN\n");
             print_hex_dump(KERN_DEBUG, "[*]    ", DUMP_PREFIX_NONE, 16, 1, priv_data->current_crypto->IV, JHU_IOCTL_CRYPTO_IV_CHAR_LEN, true);
-
-            printk(KERN_DEBUG "[*]    Post Write State {isRead: %d, isWrite: %d, isKey: %d, isIV: %d, major: %d, minor: %d}\n",
-                   priv_data->is_open_for_read, priv_data->is_open_for_write,
-                   priv_data->is_key_initialized, priv_data->is_iv_initialized,
-                   priv_data->major, priv_data->minor);
 
             break;
         default:
@@ -618,11 +609,11 @@ static int dev_release(struct inode *inodep, struct file *filep)
     // This path is called when the file descriptor is closed
     //
     // SMATOS2, EFORTE3: Init Locals
-    bool is_write, is_read;                                                                                              // Determine if this device was opened for reading or writing
-    int device_id = imajor(inodep);                                                                                      // Get Device Specific Major #
-    struct dev_private_data *priv_data = filep->private_data;                                                            // device should be opened at this stage...
-    char *device_name = (device_id == g_majornum_a) ? "Device A" : (device_id == g_majornum_b) ? "Device B" : "UNKNOWN"; // Friendly Name
-    char *device_role;                                                                                                   // Place Holder to hold the word "Read or Write"
+    bool is_write, is_read;                                   // Determine if this device was opened for reading or writing
+    int device_id = imajor(inodep);                           // Get Device Specific Major #
+    struct dev_private_data *priv_data = filep->private_data; // device should be opened at this stage...
+    char device_name[10];                                     // Friendly Name
+    char device_role[6];                                      // Place Holder to hold the word "Read or Write"
 
     // SMATOS2, EFORTE3: better safe than sorry
     if (!priv_data) {
@@ -632,7 +623,20 @@ static int dev_release(struct inode *inodep, struct file *filep)
     // SMATOS2, EFORTE3: Populate Friendly Information
     is_write = priv_data->is_open_for_write;
     is_read = priv_data->is_open_for_read;
-    device_role = is_write ? "Write" : is_read ? "Read" : "N/A";
+    strcpy(device_name, (device_id == g_majornum_a) ? "Device A" : (device_id == g_majornum_b) ? "Device B" : "UNKNOWN");
+    strcpy(device_role, is_write ? "Write" : is_read ? "Read" : "N/A");
+
+    // Writer Closed, Cleanup KEY/IV received and any message sent.
+    // There should be nothing to read anymore for the reader...
+    if (priv_data->is_open_for_write) {
+        printk("[*] Deleting data for %s\n", device_name);
+        (*priv_data->current_offset) = 0;
+        (*priv_data->current_crypto_read_ready) = false;
+        (*priv_data->current_crypto_write_ready) = false;
+        memset(priv_data->current_msg, 0, MAX_ALLOWED_MESSAGE);
+        memset(priv_data->current_crypto->KEY, 0, JHU_IOCTL_CRYPTO_KEY_CHAR_LEN); // Clear memory KEY
+        memset(priv_data->current_crypto->IV, 0, JHU_IOCTL_CRYPTO_IV_CHAR_LEN);   // Clear memory IV
+    }
 
     // SMATOS2, EFORTE3: Cleanup Private Device Data
     filep->private_data = NULL;
