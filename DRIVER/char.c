@@ -445,14 +445,14 @@ static ssize_t dev_write(struct file *filep, const char __user *buffer, size_t l
         return -EBADF;
     }
 
-    // verify if we can write and it's initialized properly
+    // SMATOS2, EFORTE3: verify if we can write and it's initialized properly
     can_write = priv_data->is_open_for_write && priv_data->is_key_initialized && priv_data->is_iv_initialized;
     if (!can_write) {
         printk(KERN_WARNING "[*]    Unable to write data because state is not ready.\n");
         return -EAGAIN;
     }
 
-    // make sure that the user doesn't attempt to write more than 1024 bytes at a time
+    // SMATOS2, EFORTE3: make sure that the user doesn't attempt to write more than 1024 bytes at a time
     if (len > MAX_ALLOWED_MESSAGE) {
         printk(KERN_WARNING "[*]    Message to write %zu is too long.\n", len);
         return -EINVAL;
