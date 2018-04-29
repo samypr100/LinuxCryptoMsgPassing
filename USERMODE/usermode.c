@@ -53,47 +53,38 @@ struct jhu_crypto_client init_client_crypto(char client, char *devname_a, char *
 int main(int argc, char **argv)
 {
 
-    char devname_a[32];
-    char devname_b[32];
-
-    signal(SIGINT, sigint_handler);
-    //signal(SIGKILL, sigint_handler);
-
+    // SMATOS2, EFORTE3: Enforce an argument
     if (argc < 2 || argv[1] == NULL) {
-        printf("Usage: ./myuser [a or b or t (test)] \n");
-        printf("Please enter an argument \n");
+        printf("Usage: ./usermode [a or b] \n");
+        printf("Please enter an argument [a or b] \n");
         return -1;
     }
 
-    //Debuging arguments
-    //printf(argv[1]);
+    // SMATOS2, EFORTE3: Add Signal Handler
+    signal(SIGINT, sigint_handler);
 
-    // TODO
-    // https://wiki.openssl.org/index.php/EVP_Symmetric_Encryption_and_Decryption#Encrypting_the_message
-    // EVP_CIPHER_CTX *ctx = EVP_CIPHER_CTX_new();
-    // const EVP_CIPHER *cipher = EVP_aes_256_cbc();
-    // const unsigned char *key;
-    // const unsigned char *IV;
-    // EVP_EncryptInit(ctx, cipher, key, IV);
+    // SMATOS2, EFORTE3: Declare Device Names using char_ioctl.h
+    char devname_a[32];
+    char devname_b[32];
     strcpy(devname_a, "/dev/");
     strcpy(devname_b, "/dev/");
     strcat(devname_a, DEVICE_NAME_A);
     strcat(devname_b, DEVICE_NAME_B);
 
-    // Initialize Randomness Pool for Seeding
-    // https://wiki.openssl.org/index.php/Random_Numbers
+    // SMATOS2, EFORTE3: Initialize Randomness Pool for Seeding
+    // Taken/Modified From: https://wiki.openssl.org/index.php/Random_Numbers
     int rc = RAND_load_file("/dev/urandom", 32); // TODO: switch to /dev/random later (since /dev/random is precious)
     if (rc != 32) {
         printf("Unable to Initialize Seed\n");
         return -1;
     }
 
-    //User interaction structure
+    // SMATOS2, EFORTE3: Trigger when argument is 'a'
     if (strchr(argv[1], 'a') != NULL) {
 
-        //If user inputs a, we read from a and write to b
-        //setup Encryption Info
-        //For 60 seconds try to obtain key/IV
+        // SMATOS2, EFORTE3
+        // If user inputs a, we read from a and write to b
+        // This call sets Encryption Info and tries to obtain KEY/IV info for 60 seconds
         struct jhu_crypto_client client_crypto = init_client_crypto('a', devname_a, devname_b);
         bool is_ready = client_crypto.is_crypto_initialized && client_crypto.is_read_client_ready && client_crypto.is_write_client_ready;
         if (!is_ready) {
@@ -106,88 +97,84 @@ int main(int argc, char **argv)
             return -1;
         }
 
-        printf("Please type your input below. The recieved data from \"b\" will show up as [b]:\n");
+        printf("Please type your input below. The received data from \"b\" will show up as [b]:\n");
         printf("Your input will show up as [me]:\n");
 
-        //Run Driver interaction
+        // SMATOS2, EFORTE3: Init Locals
+        int num_read = 0, ciphertext_len = 0, decryptedtext_len = 0;
+        char read_msg[JHU_IOCTL_MESSAGE_LIMIT] = {0};
+        char userInput[JHU_IOCTL_MESSAGE_LIMIT] = {0};
+        unsigned char ciphertext[JHU_IOCTL_MESSAGE_LIMIT] = {0};
+        unsigned char decryptedtext[JHU_IOCTL_MESSAGE_LIMIT] = {0};
 
-        //Init variables
-        int num_read;
-        char read_msg[1024];
-        int decryptedtext_len;
-        unsigned char decryptedtext[1024];
-        char userInput[1024];
-        int ciphertext_len;
-        unsigned char ciphertext[1024];
-
-        //start persistent functionality
+        // SMATOS2, EFORTE3: Start Client
         while (1) {
 
-            printf("blocking, waiting for user input\n");
-            //Write Things
-            //Take user input to send to b (write to b)
-            fgets(userInput, 1024, stdin);
-            userInput[strcspn(userInput, "\r\n")] = 0; // https://stackoverflow.com/a/28462221
-            printf("[me]:%s\n", userInput);
+            // SMATOS2, EFORTE3: Take user input to write to client B
+            printf("[me]: ");
+            fgets(userInput, JHU_IOCTL_MESSAGE_LIMIT, stdin);
+            userInput[strcspn(userInput, "\r\n")] = 0; // (Removes new line) Taken from: https://stackoverflow.com/a/28462221
+            userInput[JHU_IOCTL_MESSAGE_LIMIT] = '\0';
+            // printf("[me]: %s\n", userInput);
 
-            ciphertext_len = encrypt(userInput, strlen((char *)userInput), client_crypto.write_crypto_info.KEY, client_crypto.write_crypto_info.IV, ciphertext);
-            //printf("Ciphertext is:\n");
-            //BIO_dump_fp(stdout, (const char *)ciphertext, ciphertext_len);
-
-            write(client_crypto.write_fd, ciphertext, ciphertext_len);
-            if (errno != 0) {
-                printf("Killing myself, got an error %d from kernel, please restart the other client as well manually\n", errno);
+            // SMATOS2, EFORTE3: Encrypt User Input
+            ciphertext_len = encrypt(userInput, strlen(userInput), client_crypto.write_crypto_info.KEY, client_crypto.write_crypto_info.IV, ciphertext);
+            if (ciphertext_len < 0) {
+                printf("An error was encountered, please restart both clients.\n");
                 close(client_crypto.write_fd);
                 close(client_crypto.read_fd);
                 exit(1);
             }
 
-            //Reading Things
-            printf("blocking, waiting for data to read\n");
-            //printf("Read msg %s %zu\n", read_msg, strlen(read_msg));
+            // SMATOS2, EFORTE3: Send Encrypted Input to Client B
+            write(client_crypto.write_fd, ciphertext, ciphertext_len);
+            if (errno != 0) {
+                printf("An error was encountered with code %d, please restart both clients.\n", errno);
+                close(client_crypto.write_fd);
+                close(client_crypto.read_fd);
+                exit(1);
+            }
+
+            // SMATOS2, EFORTE3: Wait on Client B to Respond
+            printf("Waiting for client b...\n");
             while (1) {
-                num_read = read(client_crypto.read_fd, read_msg, 1024);
+                num_read = read(client_crypto.read_fd, read_msg, JHU_IOCTL_MESSAGE_LIMIT);
                 if (errno != 0) {
-                    printf("Killing myself, got an error %d from kernel, please restart the other client as well manually\n", errno);
+                    printf("An error was encountered with code %d, please restart both clients.\n", errno);
                     close(client_crypto.write_fd);
                     close(client_crypto.read_fd);
                     exit(1);
                 }
-                read_msg[1024] = '\0';
-
-                if (num_read < 1) {
-                    //printf("NO DATA READ\n");
+                read_msg[JHU_IOCTL_MESSAGE_LIMIT] = '\0';
+                // SMATOS2, EFORTE3: Number of Bytes Read must be greater than 0
+                if (num_read <= 0) {
                     sleep(0.5);
                 } else {
                     break;
                 }
             }
 
+            // SMATOS2, EFORTE3: Client B Responded
             if (num_read > 0) {
-                //printf("Read data:\n");
-                //BIO_dump_fp(stdout, (const char *)read_msg, num_read);
 
-                // Decrypt the ciphertext
+                // SMATOS2, EFORTE3: Decrypt the ciphertext
                 decryptedtext_len = decrypt(read_msg, num_read, client_crypto.read_crypto_info.KEY, client_crypto.read_crypto_info.IV, decryptedtext);
 
-                // Add a NULL terminator. We are expecting printable text
+                // SMATOS2, EFORTE3: Add a NULL terminator since we are expecting printable text
                 decryptedtext[decryptedtext_len] = '\0';
 
-                // Show the decrypted text
-                //printf("Decrypted text is:\n");
-                //printf("%s\n", decryptedtext);
-                printf("[b]:%s\n", decryptedtext);
-                //printf("[b] %s", decryptThingsFromB);
+                // SMATOS2, EFORTE3: Show the decrypted text
+                printf("[b]: %s\n", decryptedtext);
             }
         }
-
-        close(client_crypto.write_fd);
-        close(client_crypto.read_fd);
     }
 
+    // SMATOS2, EFORTE3: Trigger when argument is 'a'
     if (strchr(argv[1], 'b') != NULL) {
 
-        //If user inputs B then we read b write a
+        // SMATOS2, EFORTE3
+        // If user inputs b, we read from b and write to a
+        // This call sets Encryption Info and tries to obtain KEY/IV info for 60 seconds
         struct jhu_crypto_client client_crypto = init_client_crypto('b', devname_a, devname_b);
         bool is_ready = client_crypto.is_crypto_initialized && client_crypto.is_read_client_ready && client_crypto.is_write_client_ready;
         if (!is_ready) {
@@ -200,82 +187,79 @@ int main(int argc, char **argv)
             return -1;
         }
 
-        printf("Please type your input below. The recieved data from \"a\" will show up as [a]:\n");
+        printf("Please type your input below. The received data from \"a\" will show up as [a]:\n");
         printf("Your input will show up as [me]:\n");
 
-        int ciphertext_len;
-        unsigned char ciphertext[1024];
-        int num_read;
-        char read_msg[1024];
-        int decryptedtext_len;
-        unsigned char decryptedtext[1024];
-        char userInput[1024];
+        // SMATOS2, EFORTE3: Init Locals
+        int num_read = 0, ciphertext_len = 0, decryptedtext_len = 0;
+        char read_msg[JHU_IOCTL_MESSAGE_LIMIT] = {0};
+        char userInput[JHU_IOCTL_MESSAGE_LIMIT] = {0};
+        unsigned char ciphertext[JHU_IOCTL_MESSAGE_LIMIT] = {0};
+        unsigned char decryptedtext[JHU_IOCTL_MESSAGE_LIMIT] = {0};
 
-        //Run Driver interaction
+        // SMATOS2, EFORTE3: Start Client
         while (1) {
 
-            printf("blocking, waiting for user input\n");
-            //Write Things
-            //Take user input to send to b (write to b)
-            fgets(userInput, 1024, stdin);
-            userInput[strcspn(userInput, "\r\n")] = 0; // https://stackoverflow.com/a/28462221
-            printf("[me]:%s\n", userInput);
+            // SMATOS2, EFORTE3: Take user input to write to client A
+            printf("[me]: ");
+            fgets(userInput, JHU_IOCTL_MESSAGE_LIMIT, stdin);
+            userInput[strcspn(userInput, "\r\n")] = 0; // (Removes new line) Taken from: https://stackoverflow.com/a/28462221
+            userInput[JHU_IOCTL_MESSAGE_LIMIT] = '\0';
+            // printf("[me]: %s\n", userInput);
 
-            ciphertext_len = encrypt(userInput, strlen((char *)userInput), client_crypto.write_crypto_info.KEY, client_crypto.write_crypto_info.IV, ciphertext);
-            //printf("Ciphertext is:\n");
-            //BIO_dump_fp(stdout, (const char *)ciphertext, ciphertext_len);
-
-            write(client_crypto.write_fd, ciphertext, ciphertext_len);
-            if (errno != 0) {
-                printf("Killing myself, got an error %d from kernel, please restart the other client as well manually\n", errno);
+            // SMATOS2, EFORTE3: Encrypt User Input
+            ciphertext_len = encrypt(userInput, strlen(userInput), client_crypto.write_crypto_info.KEY, client_crypto.write_crypto_info.IV, ciphertext);
+            if (ciphertext_len < 0) {
+                printf("An error was encountered, please restart both clients.\n");
                 close(client_crypto.write_fd);
                 close(client_crypto.read_fd);
                 exit(1);
             }
 
-            //Reading Things
+            // SMATOS2, EFORTE3: Send Encrypted Input to Client A
+            write(client_crypto.write_fd, ciphertext, ciphertext_len);
+            if (errno != 0) {
+                printf("An error was encountered with code %d, please restart both clients.\n", errno);
+                close(client_crypto.write_fd);
+                close(client_crypto.read_fd);
+                exit(1);
+            }
 
-            //printf("Read msg %s %zu\n", read_msg, strlen(read_msg));
-            printf("blocking, waiting for data to read\n");
+            // SMATOS2, EFORTE3: Wait on Client A to Respond
+            printf("Waiting for client a...\n");
             while (1) {
-                num_read = read(client_crypto.read_fd, read_msg, 1024);
+                num_read = read(client_crypto.read_fd, read_msg, JHU_IOCTL_MESSAGE_LIMIT);
                 if (errno != 0) {
-                    printf("Killing myself, got an error %d from kernel, please restart the other client as well manually\n", errno);
+                    printf("An error was encountered with code %d, please restart both clients.\n", errno);
                     close(client_crypto.write_fd);
                     close(client_crypto.read_fd);
                     exit(1);
                 }
-                read_msg[1024] = '\0';
-
-                if (num_read < 1) {
-                    //printf("NO DATA READ\n");
+                read_msg[JHU_IOCTL_MESSAGE_LIMIT] = '\0';
+                // SMATOS2, EFORTE3: Number of Bytes Read must be greater than 0
+                if (num_read <= 0) {
                     sleep(0.5);
                 } else {
                     break;
                 }
             }
 
+            // SMATOS2, EFORTE3: Client A Responded
             if (num_read > 0) {
-                //printf("Read data:\n");
-                //BIO_dump_fp(stdout, (const char *)read_msg, num_read);
 
-                // Decrypt the ciphertext
+                // SMATOS2, EFORTE3: Decrypt the ciphertext
                 decryptedtext_len = decrypt(read_msg, num_read, client_crypto.read_crypto_info.KEY, client_crypto.read_crypto_info.IV, decryptedtext);
 
-                // Add a NULL terminator. We are expecting printable text
+                // SMATOS2, EFORTE3: Add a NULL terminator since we are expecting printable text
                 decryptedtext[decryptedtext_len] = '\0';
 
-                // Show the decrypted text
-                //printf("Decrypted text is:\n");
-                //printf("%s\n", decryptedtext);
-                printf("[a]:%s\n", decryptedtext);
-                //printf("[b] %s", decryptThingsFromB);
+                // SMATOS2, EFORTE3: Show the decrypted text
+                printf("[a]: %s\n", decryptedtext);
             }
         }
-        close(client_crypto.write_fd);
-        close(client_crypto.read_fd);
     }
 
+    // TODO: Remove this at the final commit
     if (strchr(argv[1], 't') != NULL) {
 
         // Init
