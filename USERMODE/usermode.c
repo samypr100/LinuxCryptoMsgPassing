@@ -73,8 +73,8 @@ int main(int argc, char **argv)
 
     // SMATOS2, EFORTE3: Initialize Randomness Pool for Seeding
     // Taken/Modified From: https://wiki.openssl.org/index.php/Random_Numbers
-    int rc = RAND_load_file("/dev/random", 64);
-    if (rc != 64) {
+    int rc = RAND_load_file("/dev/random", 32);
+    if (rc != 32) {
         printf("Unable to Initialize Seed\n");
         return -1;
     }
