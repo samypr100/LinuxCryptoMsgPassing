@@ -498,17 +498,11 @@ long dev_ioctl(struct file *filep, unsigned int ioctl_num, unsigned long ioctl_p
             return -EAGAIN;
         }
 
-        error = copy_to_user(temp_evp->KEY, priv_data->current_crypto->KEY, JHU_IOCTL_CRYPTO_KEY_CHAR_LEN);
+        error = copy_to_user(temp_evp, priv_data->current_crypto, sizeof(struct jhu_ioctl_crypto));
         if (error) {
             return -EFAULT;
         }
         priv_data->is_key_initialized = true;
-
-        error = copy_to_user(temp_evp->IV, priv_data->current_crypto->IV, JHU_IOCTL_CRYPTO_IV_CHAR_LEN);
-        if (error) {
-            priv_data->is_key_initialized = false;
-            return -EFAULT;
-        }
         priv_data->is_iv_initialized = true;
 
         printk(KERN_INFO "[*]    KEY READ\n");
@@ -537,20 +531,13 @@ long dev_ioctl(struct file *filep, unsigned int ioctl_num, unsigned long ioctl_p
         memset(priv_data->current_crypto->KEY, 0, JHU_IOCTL_CRYPTO_KEY_CHAR_LEN);
         memset(priv_data->current_crypto->IV, 0, JHU_IOCTL_CRYPTO_IV_CHAR_LEN);
 
-        error = copy_from_user(priv_data->current_crypto->KEY, temp_evp->KEY, JHU_IOCTL_CRYPTO_KEY_CHAR_LEN);
+        error = copy_from_user(priv_data->current_crypto, temp_evp, sizeof(struct jhu_ioctl_crypto));
         if (error) {
-            memset(priv_data->current_crypto->KEY, 0, JHU_IOCTL_CRYPTO_KEY_CHAR_LEN); // Clear memory after error
-            return -EFAULT;
-        }
-        priv_data->is_key_initialized = true;
-
-        error = copy_from_user(priv_data->current_crypto->IV, temp_evp->IV, JHU_IOCTL_CRYPTO_IV_CHAR_LEN);
-        if (error) {
-            priv_data->is_key_initialized = false;                                    // keeping it consistent
             memset(priv_data->current_crypto->KEY, 0, JHU_IOCTL_CRYPTO_KEY_CHAR_LEN); // Clear memory after error
             memset(priv_data->current_crypto->IV, 0, JHU_IOCTL_CRYPTO_IV_CHAR_LEN);   // Clear memory after error
             return -EFAULT;
         }
+        priv_data->is_key_initialized = true;
         priv_data->is_iv_initialized = true;
 
         // Indicate that Crypto Info has been written to Device
