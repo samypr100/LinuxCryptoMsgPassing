@@ -23,33 +23,33 @@
 // This header is required for the ioctl() call
 #include <sys/ioctl.h>
 
-// SMATOS2, EFORTE3 LibSSL
+// SMATOS2, EFORTE3: LibSSL Specifics
 #include <openssl/aes.h>
 #include <openssl/err.h>
 #include <openssl/evp.h>
 #include <openssl/rand.h>
 
-// SMATOS2, EFORTE3 Structure Per Client
+// SMATOS2, EFORTE3: Structure Per Client (e.g. Client A and Client B)
 struct jhu_crypto_client {
-    int read_fd;
-    int write_fd;
-    bool is_read_client_ready;
-    bool is_write_client_ready;
-    bool is_crypto_initialized;
-    struct jhu_ioctl_crypto read_crypto_info;
-    struct jhu_ioctl_crypto write_crypto_info;
+    int read_fd;                               // FD that client should read from
+    int write_fd;                              // FD that client should write to
+    bool is_read_client_ready;                 // Bool indicating Reading is Possible
+    bool is_write_client_ready;                // Bool indicating Writing is Possible
+    bool is_crypto_initialized;                // Bool indicating "Current" Client's Crypto Info is Initialized
+    struct jhu_ioctl_crypto read_crypto_info;  // Structure that contains Crypto Info to use when reading from read_fd
+    struct jhu_ioctl_crypto write_crypto_info; // Structure that contains Crypto Info to use when writing to write_fd
 } __attribute__((__packed__));
 
-//https://stackoverflow.com/questions/4217037/catch-ctrl-c-in-c
-//void sigint_handler(int);
-
+// SMATOS2, EFORTE3
+// Taken From https://stackoverflow.com/questions/4217037/catch-ctrl-c-in-c
+// Add Signal Handler for Nice Message on Exit
 void sigint_handler(int sig)
 {
     printf("\nQuiting process %d\n", getpid());
     exit(0);
 }
 
-// SMATOS2, EFORTE3 Taken/Mofified from https://wiki.openssl.org/index.php/EVP_Symmetric_Encryption_and_Decryption#Encrypting_the_message
+// SMATOS2, EFORTE3 Taken/Modified from https://wiki.openssl.org/index.php/EVP_Symmetric_Encryption_and_Decryption#Encrypting_the_message
 int encrypt(unsigned char *plaintext, int plaintext_len, unsigned char *key, unsigned char *iv, unsigned char *ciphertext)
 {
     EVP_CIPHER_CTX *ctx;
@@ -103,7 +103,7 @@ int encrypt(unsigned char *plaintext, int plaintext_len, unsigned char *key, uns
     return ciphertext_len;
 }
 
-// SMATOS2, EFORTE3 Taken/Mofified from https://wiki.openssl.org/index.php/EVP_Symmetric_Encryption_and_Decryption#Decrypting_the_Message
+// SMATOS2, EFORTE3 Taken/Modified from https://wiki.openssl.org/index.php/EVP_Symmetric_Encryption_and_Decryption#Decrypting_the_Message
 int decrypt(unsigned char *ciphertext, int ciphertext_len, unsigned char *key, unsigned char *iv, unsigned char *plaintext)
 {
     EVP_CIPHER_CTX *ctx;
@@ -157,32 +157,41 @@ int decrypt(unsigned char *ciphertext, int ciphertext_len, unsigned char *key, u
     return plaintext_len;
 }
 
+// SMATOS2, EFORTE3: Sends IOCTL WRITE to the Device
+// This is used to write KEY/IV information
 int ioctl_set_data(int fd, const unsigned char *key, const unsigned char *IV)
 {
 
     printf("[+] %s called\n", __FUNCTION__);
 
+    // SMATOS2, EFORTE3: Create jhu_ioctl_crypto based on Input
     struct jhu_ioctl_crypto crypto_info;
     strncpy(crypto_info.KEY, key, JHU_IOCTL_CRYPTO_KEY_CHAR_LEN);
     strncpy(crypto_info.IV, IV, JHU_IOCTL_CRYPTO_IV_CHAR_LEN);
 
+    // SMATOS2, EFORTE3: Print Key/IV for debugging purposes
     printf("[+] Key Written is:\n");
     BIO_dump_fp(stdout, crypto_info.KEY, JHU_IOCTL_CRYPTO_KEY_CHAR_LEN);
     printf("[+] IV Written is:\n");
     BIO_dump_fp(stdout, crypto_info.IV, JHU_IOCTL_CRYPTO_IV_CHAR_LEN);
 
+    // SMATOS2, EFORTE3: Send IOCTL command
     ioctl(fd, IOCTL_WRITE_TO_KERNEL, &crypto_info);
 
     return 0;
 }
 
+// SMATOS2, EFORTE3: Sends IOCTL READ to the Device
+// This is used to read KEY/IV information
 int ioctl_read_data(int fd, struct jhu_ioctl_crypto *crypto_info)
 {
 
     printf("[+] %s called\n", __FUNCTION__);
 
+    // SMATOS2, EFORTE3: Send IOCTL command
     ioctl(fd, IOCTL_READ_FROM_KERNEL, crypto_info);
 
+    // SMATOS2, EFORTE3: Print Key/IV for debugging purposes
     printf("[+] Key Read is:\n");
     BIO_dump_fp(stdout, crypto_info->KEY, JHU_IOCTL_CRYPTO_KEY_CHAR_LEN);
     printf("[+] IV Read is:\n");
@@ -191,26 +200,31 @@ int ioctl_read_data(int fd, struct jhu_ioctl_crypto *crypto_info)
     return 0;
 }
 
+// SMATOS2, EFORTE3: Initializes a Client both Devices and exchanges Crypto Info
+// This implements the logic of calling a Device Driver with Key/IV info
+// It also waits 60 seconds for the other client to be ready
 struct jhu_crypto_client init_client_crypto(char client, char *devname_a, char *devname_b)
 {
 
-    int rc_key, rc_iv;
-    int fd_read, fd_write;
-    int sleep_limit = 60;
-    int ioctl_read_rc, ioctl_write_rc;
-    struct jhu_crypto_client crypto_client;
-    char opposite_client = (client == 'a') ? 'b' : 'a';
-    char *dev_to_read = (client == 'a') ? devname_a : devname_b;
-    char *dev_to_write = (client == 'a') ? devname_b : devname_a;
+    // SMATOS2, EFORTE3: Init Locals
+    int rc_key, rc_iv;                                            // KEY/IV Init Return Codes
+    int fd_read, fd_write;                                        // FD's for Read and Write
+    int sleep_limit = 60;                                         // Sleep Timeout
+    int ioctl_read_rc, ioctl_write_rc;                            // Responses from IOCTL calls
+    struct jhu_crypto_client crypto_client;                       // Client Initialization Structure
+    char opposite_client = (client == 'a') ? 'b' : 'a';           // Used to determine the client this client will talk to
+    char *dev_to_read = (client == 'a') ? devname_a : devname_b;  // Used to determine the device to read from
+    char *dev_to_write = (client == 'a') ? devname_b : devname_a; // Used to determine the device to write to
 
     printf("Setting up encryption info for client %c \n", client);
+    // SMATOS2, EFORTE3: Init Client's Struct with Safe Defaults
     crypto_client.read_fd = -1;
     crypto_client.write_fd = -1;
     crypto_client.is_read_client_ready = false;
     crypto_client.is_write_client_ready = false;
     crypto_client.is_crypto_initialized = false;
 
-    // Setup my Crypto Info for Reading
+    // SMATOS2, EFORTE3: Setup Current Client Crypto Info for Reading
     rc_key = RAND_bytes(crypto_client.read_crypto_info.KEY, JHU_IOCTL_CRYPTO_KEY_CHAR_LEN);
     rc_iv = RAND_bytes(crypto_client.read_crypto_info.IV, JHU_IOCTL_CRYPTO_IV_CHAR_LEN);
     if (!rc_iv || !rc_key) {
@@ -219,13 +233,16 @@ struct jhu_crypto_client init_client_crypto(char client, char *devname_a, char *
     }
     crypto_client.is_crypto_initialized = true;
 
-    // Opposing Client, Send My Crypto Info for Reading
+    // SMATOS2, EFORTE3
+    // Send Current Client's Crypto Info for to the Opposing Client to allow him to read this client's messages
+    // Also open opposing client's device for writing since this client will be sending messages to him
     printf("Sending encryption info to client %c on device %s \n", opposite_client, dev_to_write);
     fd_write = open(dev_to_write, O_WRONLY);
     if (fd_write < 0 || errno != 0) {
         printf("Can't open device file: %s for writing \n", dev_to_write);
         return crypto_client;
     }
+    // SMATOS2, EFORTE3: Perform the IOCTL write of KEY/IV Information
     ioctl_write_rc = ioctl_set_data(fd_write, crypto_client.read_crypto_info.KEY, crypto_client.read_crypto_info.IV);
     if (ioctl_write_rc < 0 || errno != 0) {
         printf("Can't initialize KEY/IV for writing on %s \n", dev_to_write);
@@ -235,7 +252,9 @@ struct jhu_crypto_client init_client_crypto(char client, char *devname_a, char *
     crypto_client.write_fd = fd_write;
     crypto_client.is_write_client_ready = true;
 
-    // Current Client (Self), Get Crypto Info for Writing
+    // SMATOS2, EFORTE3
+    // Retrieve Crypto Info for the Opposing Client in order to be able to encrypt the messages this client will send him
+    // Also open this client's device for reading messages encrypted with this clients crypto info
     printf("Preparing to wait for %c on device %s \n", opposite_client, dev_to_read);
     fd_read = open(dev_to_read, O_RDONLY);
     if (fd_read < 0 || errno != 0) {
@@ -243,7 +262,9 @@ struct jhu_crypto_client init_client_crypto(char client, char *devname_a, char *
         close(fd_write);
         return crypto_client;
     }
+    // SMATOS2, EFORTE3: Perform the IOCTL read of KEY/IV Information
     ioctl_read_rc = ioctl_read_data(fd_read, &crypto_client.write_crypto_info);
+    // SMATOS2, EFORTE3: Retry each second up to 60 seconds if the opposing client is not ready (has not sent KEY/IV info)
     while (sleep_limit > 0 && errno == EAGAIN) {
         printf("Waiting for %c... %d \n", opposite_client, sleep_limit);
         sleep_limit--;
